@@ -39,7 +39,11 @@
 ## 反馈系统
 
 - **本地点评**（离线，零配置）：15+ 条中国学习者高频错误规则（三单、不可数名词、although/but 混用、because/so 混用等）+ 长度、重复用词、长句、连接词、大小写检查
-- **AI 深度点评**（可选）：「记录」页配置接口地址 + 模型 + API Key，支持任何 OpenAI 格式接口（OpenAI / OpenRouter / DeepSeek / 本地模型）
+- **AI 深度点评**（可选）：「记录」页配置接口地址 + 模型 + API Key，支持任何 OpenAI 格式接口；配置后先点「测试连接」确认通畅
+  - Kimi：`https://api.moonshot.cn/v1`，模型如 `kimi-k2-0905-preview`
+  - DeepSeek：`https://api.deepseek.com/v1`，模型 `deepseek-chat`
+  - OpenRouter：`https://openrouter.ai/api/v1`
+  - 注意地址只填到 `/v1`，不要带 `/chat/completions`
 - 两类反馈都可以存为复习点，进入「看中文回忆正确英文表达」的复习流程；复习点在表达库中带「反馈」标签
 - AI Key 只保存在本机浏览器 localStorage，注意它会包含在导出的 JSON 备份里
 

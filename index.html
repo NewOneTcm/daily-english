@@ -953,7 +953,7 @@ function renderMe(main) {
         <button class="btn" id="aiTest">测试连接</button>
       </div>
       <div class="ai-status" id="aiTestResult"></div>
-      <p class="hint">任何兼容 OpenAI 格式的接口都行（OpenAI / OpenRouter / DeepSeek / 本地模型等）。不配也不影响本地点评，本地点评永远离线可用。</p>
+      <p class="hint">任何兼容 OpenAI 格式的接口都行。常用地址：Kimi → https://api.moonshot.cn/v1（模型 kimi-k2-0905-preview）· DeepSeek → https://api.deepseek.com/v1（模型 deepseek-chat）· OpenRouter → https://openrouter.ai/api/v1。注意地址只填到 /v1。不配也不影响本地点评，本地点评永远离线可用。</p>
     </div>
     <div class="card">
       <div class="section-title">数据备份</div>
@@ -983,6 +983,7 @@ function renderMe(main) {
     const out = $("#aiTestResult");
     const show = (msg, ok) => { out.textContent = msg; out.style.color = ok ? "var(--accent)" : "var(--red)"; };
     if (!base || !model || !key) { show("⚠ 接口地址、模型、Key 三个都要填", false); return; }
+    if (/\/chat\/completions\/?$/i.test(base)) { show("⚠ 地址填到 /v1 为止，不要带 /chat/completions（工具会自动拼）", false); return; }
     show("测试中…", true);
     const t0 = Date.now();
     try {
