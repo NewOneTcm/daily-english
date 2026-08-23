@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>每天用英语 · Daily English</title>
+<style>
+  :root {
+    --bg: #f6f7f6;
+    --panel: #ffffff;
+    --ink: #1d2421;
+    --ink-2: #5c6660;
+    --line: #e3e7e4;
+    --accent: #17795b;
+    --accent-soft: #e4f2ec;
+    --amber: #d97b1e;
+    --red: #c2483d;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+    background: var(--bg); color: var(--ink);
+    line-height: 1.6; min-height: 100vh;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; padding: 20px 16px 80px; }
+
+  header.top {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 0 16px; flex-wrap: wrap;
+  }
+  header.top h1 { font-size: 18px; font-weight: 700; letter-spacing: 0; }
+  .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 999px; padding: 3px 11px; font-size: 13px; color: var(--ink-2);
+  }
+  .pill.streak b { color: var(--amber); font-size: 14px; }
+  .pill.level { cursor: pointer; font-weight: 600; color: var(--accent); }
+  .pill.level:hover { border-color: var(--accent); }
+
+  nav.tabs {
+    display: flex; gap: 4px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 4px; margin-bottom: 18px;
+  }
+  nav.tabs button {
+    flex: 1; border: none; background: none; padding: 8px 4px;
+    font-size: 14px; color: var(--ink-2); border-radius: 6px; cursor: pointer;
+    font-family: inherit;
+  }
+  nav.tabs button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  nav.tabs .badge {
+    display: inline-block; min-width: 17px; text-align: center;
+    background: var(--red); color: #fff; border-radius: 999px;
+    font-size: 11px; padding: 0 5px; margin-left: 4px; line-height: 17px;
+  }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 20px;
+  }
+  .card + .card { margin-top: 14px; }
+
+  .task-type {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); border-radius: 999px; padding: 2px 10px;
+  }
+  .task-cn { font-size: 19px; font-weight: 700; margin: 12px 0 6px; }
+  .task-en { color: var(--ink-2); font-size: 15px; font-style: italic; }
+  .task-meta { margin-top: 12px; font-size: 13px; color: var(--ink-2); }
+
+  textarea {
+    width: 100%; min-height: 140px; resize: vertical;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; font-size: 15px; font-family: inherit;
+    background: #fbfcfb; color: var(--ink); line-height: 1.6;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  input[type=text] {
+    width: 100%; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 9px 12px; font-size: 14px; font-family: inherit; background: #fbfcfb;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: var(--radius); padding: 10px 18px; font-size: 14px;
+    cursor: pointer; font-family: inherit; font-weight: 600;
+  }
+  .btn:hover { border-color: #c8cfcb; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: #12644c; }
+  .btn.ghost { border-color: transparent; color: var(--ink-2); font-weight: 500; }
+  .btn.ghost:hover { background: #eff1ef; }
+  .btn.danger { color: var(--red); }
+  .btn:disabled { opacity: .45; cursor: default; }
+  .btn-row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+
+  .wordcount { font-size: 13px; color: var(--ink-2); margin-top: 6px; }
+  .wordcount b { color: var(--accent); }
+
+  .timer { font-size: 40px; font-weight: 700; text-align: center; padding: 18px 0 4px; font-variant-numeric: tabular-nums; }
+  .timer-label { text-align: center; color: var(--ink-2); font-size: 13px; margin-bottom: 8px; }
+
+  .done-hero { text-align: center; padding: 26px 10px; }
+  .done-hero .big { font-size: 42px; }
+  .done-hero h2 { font-size: 20px; margin: 8px 0 4px; }
+  .done-hero p { color: var(--ink-2); font-size: 14px; }
+
+  .banner {
+    border: 1px solid #f0d9b8; background: #fdf6ec; color: #7a5210;
+    border-radius: var(--radius); padding: 12px 16px; font-size: 14px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .banner .btn { padding: 5px 12px; font-size: 13px; }
+
+  .review-q { font-size: 20px; font-weight: 700; text-align: center; padding: 24px 8px 6px; }
+  .review-ctx { text-align: center; color: var(--ink-2); font-size: 14px; padding-bottom: 10px; }
+  .review-a {
+    text-align: center; font-size: 18px; color: var(--accent); font-weight: 600;
+    padding: 14px 8px; border-top: 1px dashed var(--line);
+  }
+  .grade-row { display: flex; gap: 8px; }
+  .grade-row .btn { flex: 1; }
+
+  ul.list { list-style: none; }
+  ul.list li {
+    display: flex; align-items: baseline; gap: 10px;
+    padding: 10px 2px; border-bottom: 1px solid var(--line); font-size: 14px;
+  }
+  ul.list li:last-child { border-bottom: none; }
+  ul.list .en { font-weight: 600; }
+  ul.list .zh { color: var(--ink-2); flex: 1; }
+  ul.list .due { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+  ul.list .due.today { color: var(--red); font-weight: 600; }
+
+  .hist-item { border-bottom: 1px solid var(--line); padding: 12px 2px; }
+  .hist-item:last-child { border-bottom: none; }
+  .hist-head { display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--ink-2); }
+  .hist-head b { color: var(--ink); font-size: 14px; }
+  .hist-text {
+    margin-top: 6px; font-size: 14px; color: var(--ink);
+    background: #fbfcfb; border: 1px solid var(--line); border-radius: 6px;
+    padding: 10px 12px; white-space: pre-wrap; word-break: break-word;
+  }
+
+  .empty { text-align: center; color: var(--ink-2); padding: 30px 10px; font-size: 14px; }
+  .hint { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } }
+
+  ul.tips { list-style: none; margin-top: 10px; }
+  ul.tips li {
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius);
+    margin-bottom: 8px; font-size: 14px; background: #fbfcfb;
+  }
+  ul.tips .tip-zh { font-weight: 600; }
+  ul.tips .tip-en { color: var(--accent); font-weight: 600; margin-top: 2px; }
+  ul.tips .tip-ctx { color: var(--ink-2); font-size: 13px; margin-top: 2px; font-style: italic; }
+  ul.tips .btn { padding: 4px 12px; font-size: 12px; margin-top: 6px; }
+  ul.tips .saved-mark { font-size: 12px; color: var(--accent); margin-top: 6px; display: inline-block; }
+  .tag-fb {
+    font-size: 11px; background: #fbe9e7; color: var(--red);
+    border-radius: 4px; padding: 0 6px; margin-right: 2px; white-space: nowrap;
+  }
+  .ai-status { font-size: 13px; color: var(--ink-2); margin-top: 8px; }
+
+  /* onboarding */
+  .level-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  @media (max-width: 520px) { .level-grid { grid-template-columns: 1fr; } }
+  .level-opt {
+    border: 1px solid var(--line); border-radius: var(--radius);
+    background: var(--panel); padding: 14px; cursor: pointer; text-align: left;
+    font-family: inherit;
+  }
+  .level-opt:hover { border-color: var(--accent); }
+  .level-opt b { font-size: 16px; color: var(--accent); }
+  .level-opt p { font-size: 13px; color: var(--ink-2); margin-top: 4px; line-height: 1.5; }
+
+  .stat-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stat {
+    flex: 1; background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 14px; text-align: center;
+  }
+  .stat b { display: block; font-size: 24px; color: var(--accent); }
+  .stat span { font-size: 12px; color: var(--ink-2); }
+  .stat.amber b { color: var(--amber); }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+"use strict";
+
+/* ============ 数据层 ============ */
+const STORE_KEY = "daily-english.v1";
+const LEVEL_ORDER = ["A1", "A2", "B1", "B2", "C1", "C2"];
+const LEVELS = {
+  A1: { label: "A1 入门",  desc: "能写简单句子，介绍自己、日常物品", words: 15,  secs: 60 },
+  A2: { label: "A2 基础",  desc: "能讲过去的事、写简单邮件和回复", words: 30,  secs: 90 },
+  B1: { label: "B1 进阶",  desc: "能表达观点、描述经历、处理日常沟通", words: 50,  secs: 120 },
+  B2: { label: "B2 独立",  desc: "能有理有据地争论、写工作邮件", words: 80,  secs: 150 },
+  C1: { label: "C1 流利",  desc: "能即兴演讲、写有说服力的长文", words: 120, secs: 180 },
+  C2: { label: "C2 精通",  desc: "能玩转风格、幽默和精准辨析", words: 150, secs: 180 },
+};
+const REVIEW_STEPS = [0, 1, 3, 7, 16, 35]; // 间隔天数
+
+function todayKey(offset = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
+
+function blankState() {
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, ai: { base: "", key: "", model: "" } };
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return blankState();
+    return Object.assign(blankState(), JSON.parse(raw));
+  } catch (e) { return blankState(); }
+}
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+let state = load();
+
+/* ============ 任务库：全是"真实使用场景" ============ */
+const TASKS = {
+  A1: [
+    { t: "写", cn: "用英语写 3 句自我介绍：名字、城市、一个爱好", en: "Introduce yourself in 3 sentences: name, city, one hobby." },
+    { t: "说", cn: "看着你的桌子，大声说出 5 样东西：There is a ...", en: "Look at your desk. Say 5 things out loud: 'There is a ...'" },
+    { t: "写", cn: "你今天吃了什么？写下来（可以配表情吐槽）", en: "What did you eat today? Write it down." },
+    { t: "说", cn: "描述今天的天气和你穿的衣服", en: "Describe today's weather and what you are wearing." },
+    { t: "写", cn: "给家人或朋友发一条英文消息，真的发出去", en: "Send a real English message to a friend or family member." },
+    { t: "说", cn: "说出你一天的时间表：I get up at ...", en: "Say your daily schedule out loud." },
+    { t: "写", cn: "列出你房间里 8 样东西的英文，不查词典先写", en: "List 8 things in your room in English. No dictionary first." },
+    { t: "说", cn: "介绍一位家庭成员：TA 是谁、什么样、喜欢什么", en: "Introduce a family member out loud." },
+    { t: "写", cn: "这个周末你打算干嘛？写 3 句（be going to）", en: "Write 3 sentences about your weekend plans." },
+    { t: "说", cn: "假装在咖啡店，大声点一杯你想喝的", en: "Role-play: order a drink out loud." },
+    { t: "写", cn: "你最喜欢的一道菜是什么？为什么？写 3 句", en: "Your favorite food: what and why? 3 sentences." },
+    { t: "说", cn: "你现在在哪？描述你周围看到的东西", en: "Describe where you are right now and what you see." },
+  ],
+  A2: [
+    { t: "写", cn: "昨天你做了什么？写 4-5 句（过去式）", en: "What did you do yesterday? 4-5 sentences, past tense." },
+    { t: "说", cn: "讲一部你看过的电影或剧：讲了什么、你喜不喜欢", en: "Talk about a movie or show you watched." },
+    { t: "写", cn: "给朋友写封邮件，推荐一家你去过的餐厅", en: "Write an email recommending a restaurant to a friend." },
+    { t: "说", cn: "比较两个季节或两个你住过的地方，哪个更好", en: "Compare two seasons or two places you lived in." },
+    { t: "写", cn: "回复一条邀请：接受或礼貌拒绝（编一个也行）", en: "Reply to an invitation: accept or politely decline." },
+    { t: "说", cn: "描述你每天上班/上学的路线", en: "Describe your daily commute route." },
+    { t: "写", cn: "你上一次假期去了哪？发生了什么？", en: "Write about your last vacation." },
+    { t: "说", cn: "教一个不会做饭的人做一道你会的菜", en: "Explain how to cook a dish you know." },
+    { t: "写", cn: "一件东西坏了，写一段投诉（网购客服场景）", en: "Write a complaint about a broken product." },
+    { t: "说", cn: "你手机里最常用的 3 个 app，分别用来干嘛", en: "Your top 3 apps: what do you use them for?" },
+    { t: "写", cn: "下周有什么安排？写出来（将来时）", en: "Write your plans for next week." },
+    { t: "说", cn: "打开相册挑一张照片，描述它", en: "Pick a photo from your phone and describe it." },
+  ],
+  B1: [
+    { t: "写", cn: "今天发生的一件有意思（或离谱）的事", en: "Write about one interesting thing that happened today." },
+    { t: "说", cn: "你怎么看远程办公？说 2 分钟你的真实想法", en: "Your honest take on remote work, 2 minutes." },
+    { t: "写", cn: "写一条英文动态总结这一周，可以发出去", en: "Write an English post summarizing your week." },
+    { t: "说", cn: "把你专业里的一个概念讲给完全不懂的人听", en: "Explain a concept from your field to a beginner." },
+    { t: "写", cn: "写封邮件请假或调整会议时间", en: "Write an email asking for leave or rescheduling a meeting." },
+    { t: "说", cn: "你最近做的一个决定：是什么、为什么这么定", en: "A recent decision you made and why." },
+    { t: "写", cn: "推荐一本书/剧/游戏，说服我去看", en: "Recommend a book/show/game and convince me." },
+    { t: "说", cn: "描述一个你佩服的人，TA 哪点打动你", en: "Describe someone you admire and why." },
+    { t: "写", cn: "吐槽一件今天让你不爽的小事，越生动越好", en: "Rant about something that annoyed you today." },
+    { t: "说", cn: "如果明天突然放假一天，你会怎么过", en: "If tomorrow was a free day off, what would you do?" },
+    { t: "写", cn: "写给三个月后的自己几句话", en: "Write a few lines to yourself three months from now." },
+    { t: "说", cn: "现在的你和五年前的你，最大的不同是什么", en: "Compare yourself now with five years ago." },
+  ],
+  B2: [
+    { t: "写", cn: "挑一个最近的热点话题，写一段你的立场", en: "Pick a trending topic and write your position on it." },
+    { t: "说", cn: "辩论题：AI 会让你的工作更好还是更糟？选边站", en: "Debate: will AI make your job better or worse? Pick a side." },
+    { t: "写", cn: "一个犹豫不决的朋友来信，写封建议信", en: "A friend is hesitating over a choice. Write advice." },
+    { t: "说", cn: "讲一次你搞砸的经历，和你学到的东西", en: "Tell a story about a failure and what you learned." },
+    { t: "写", cn: "给一个产品写一条有理有据的差评", en: "Write a well-argued negative product review." },
+    { t: "说", cn: "向外国朋友解释一个中国习俗或网络现象", en: "Explain a Chinese custom or internet phenomenon." },
+    { t: "写", cn: "今天你读到/学到的一个东西，用自己的话总结", en: "Summarize one thing you read or learned today." },
+    { t: "说", cn: "描述你的理想工作日，从早到晚", en: "Describe your ideal workday from morning to night." },
+    { t: "写", cn: "写封邮件向上司争取资源或支持", en: "Write an email to your boss asking for resources." },
+    { t: "说", cn: "如果给你一笔启动资金，你会做什么？为什么", en: "Given seed money, what would you build and why?" },
+    { t: "写", cn: "找一个你不同意的观点，写一段反驳", en: "Find an opinion you disagree with and rebut it." },
+    { t: "说", cn: "讲讲你所在行业最近的一个变化，你怎么看", en: "A recent change in your industry and your take." },
+  ],
+  C1: [
+    { t: "写", cn: "就「习惯 vs 自律」写一段有立场的短评", en: "Write an opinion piece: habits vs discipline." },
+    { t: "说", cn: "即兴 3 分钟：今天你脑子里出现最多的一个念头", en: "Improvise 3 minutes on today's most recurring thought." },
+    { t: "写", cn: "挑一个中文网络热梗，用英语解释给老外听", en: "Explain a Chinese internet meme in English." },
+    { t: "说", cn: "复盘你最近做的一件事：什么有效、什么无效", en: "Debrief a recent project: what worked, what didn't." },
+    { t: "写", cn: "为你正在做的事写一段 pitch，说服别人加入", en: "Write a pitch for something you're working on." },
+    { t: "说", cn: "讲一件你改变了看法的事，原来怎么想、现在怎么想", en: "Something you changed your mind about." },
+    { t: "写", cn: "给十年前的自己写封信", en: "Write a letter to yourself ten years ago." },
+    { t: "说", cn: "解释一个你持有的反直觉观点", en: "Explain a counterintuitive opinion you hold." },
+    { t: "写", cn: "给你最近在用的一个工具写篇短评测", en: "Write a short review of a tool you use." },
+    { t: "说", cn: "如果要做一场 TED 演讲你讲什么？说出大纲", en: "Your TED talk: topic and outline, out loud." },
+    { t: "写", cn: "写一封措辞讲究的正式投诉信", en: "Write a formal, well-worded complaint letter." },
+    { t: "说", cn: "描述一个你想建立的系统（不是目标）", en: "Describe a system you want to build, not a goal." },
+  ],
+  C2: [
+    { t: "写", cn: "模仿你最喜欢的作家的风格写一段", en: "Write a passage imitating your favorite author's style." },
+    { t: "说", cn: "挑一个模糊概念（如「内卷」「松弛感」）做精确辨析", en: "Dissect a fuzzy concept with precision, 3 minutes." },
+    { t: "写", cn: "写一段黑色幽默短文吐槽现代生活", en: "Write a darkly comic piece about modern life." },
+    { t: "说", cn: "同一件事，用三种方式讲：给孩子、给同事、给专家", en: "Explain one thing three ways: child, colleague, expert." },
+    { t: "写", cn: "为一个你深信的观点写最强的反方论证", en: "Steel-man the opposite of something you believe." },
+    { t: "说", cn: "把今天一个尴尬瞬间讲成一个好笑的故事", en: "Turn an awkward moment today into a funny story." },
+    { t: "写", cn: "给一个英文播客/作者写封有观点的反馈邮件", en: "Write thoughtful feedback to an English podcast or writer." },
+    { t: "说", cn: "谈谈语言如何影响你的思维方式", en: "How does language shape the way you think?" },
+    { t: "写", cn: "写一个短篇故事的开头，150 词以内", en: "Write the opening of a short story, under 150 words." },
+    { t: "说", cn: "为你做过的一个有争议的选择辩护", en: "Defend a controversial choice you made." },
+    { t: "写", cn: "把你专业里一个难概念写成一段优雅的科普", en: "Turn a hard concept from your field into elegant prose." },
+    { t: "说", cn: "如果人生可以 A/B 测试，你想测什么", en: "If you could A/B test your life, what would you test?" },
+  ],
+};
+
+/* ============ 工具 ============ */
+const $ = (sel, el = document) => el.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function countWords(text) {
+  const m = String(text || "").trim().match(/[A-Za-z0-9']+/g);
+  return m ? m.length : 0;
+}
+
+/* ============ 本地反馈引擎（离线，零配置） ============ */
+const STOP = new Set(("the,a,an,and,or,but,so,because,if,i,you,he,she,it,we,they,is,are,was,were,am,be,been,being," +
+  "do,does,did,have,has,had,will,would,can,could,should,shall,to,of,in,on,at,for,with,about,as,by,from,up,out,off," +
+  "that,this,these,those,there,here,my,your,his,her,its,our,their,me,him,us,them,not,no,very,really,just,also,too," +
+  "when,what,where,who,whom,how,which,than,then,some,any,all,each,every,both,few,more,most,other,own,same,only").split(","));
+
+// 中国学习者高频错误模式：命中原句 → 正确说法
+const FEEDBACK_RULES = [
+  { re: /\bi am agree\b/i, zh: "「I am agree」→ agree 本身就是动词，前面不加 am", en: "I agree." },
+  { re: /\bmore (better|easier|worse|faster|slower|bigger|smaller|cheaper|happier|simpler)\b/i, zh: "比较级前不用 more", en: "more better → better（-er 结尾的词本身已是比较级）" },
+  { re: /\b(he|she|it) don't\b/i, zh: "第三人称单数：he/she/it 后面用 doesn't", en: "he doesn't / she doesn't / it doesn't" },
+  { re: /\bpeople (is|was|has)\b/i, zh: "people 是复数", en: "people are / people were / people have" },
+  { re: /\b(informations|advices|feedbacks|homeworks|equipments|knowledges|furnitures|stuffs)\b/i, zh: "不可数名词没有复数形式", en: "information / advice / feedback / homework / equipment / knowledge / furniture / stuff" },
+  { re: /\bi very like\b/i, zh: "「I very like」是中式语序", en: "I really like … / I like it very much" },
+  { re: /\bin the internet\b/i, zh: "上网用 on，不用 in", en: "on the internet" },
+  { re: /\baccording to me\b/i, zh: "「according to me」不地道", en: "in my opinion / from my perspective / I think" },
+  { re: /\bopen the (light|tv|computer|phone)\b/i, zh: "开电器用 turn on", en: "turn on the light / turn on the TV" },
+  { re: /\bhave (went|did|saw|ate|came|took|wrote|spoke|bought|made)\b/i, zh: "have 后面要接过去分词", en: "have gone / have done / have seen / have eaten" },
+  { re: /\byesterday\b[^.!?]{0,50}\bhave\b|\bhave\b[^.!?]{0,50}\byesterday\b/i, zh: "有 yesterday 时用一般过去时，不用 have", en: "I did it yesterday.（不是 I have done it yesterday）" },
+  { re: /\balthough\b[^.!?]{0,120}\bbut\b/i, zh: "although 和 but 一个句子里只用一个", en: "Although it rained, I went out. / It rained, but I went out." },
+  { re: /\bbecause\b[^.!?]{0,120}\bso\b/i, zh: "because 和 so 一个句子里只用一个", en: "Because I was tired, I slept early. / I was tired, so I slept early." },
+  { re: /\bplay (the )?phone\b/i, zh: "「玩手机」不是 play phone", en: "use my phone / be on my phone" },
+  { re: /\bhow to say\b/i, zh: "卡壳时说 how to say 不太地道", en: "how should I put it / what's the word" },
+];
+
+const LINK_WORDS = /\b(however|because|although|though|but|so|then|also|for example|for instance|in addition|first|second|finally|instead|therefore|besides|actually)\b/i;
+
+function analyzeWriting(text, level) {
+  const tips = [];
+  const lv = LEVELS[level] || LEVELS.B1;
+  const words = text.match(/[A-Za-z']+/g) || [];
+  const wc = words.length;
+  const sentences = text.split(/[.!?…]+/).map(s => s.trim()).filter(Boolean);
+
+  for (const r of FEEDBACK_RULES) {
+    const m = text.match(r.re);
+    if (m) tips.push({ zh: r.zh, en: r.en, ctx: "「" + m[0].slice(0, 120) + "」" });
+  }
+  const badCap = sentences.find(s => /^[a-z]/.test(s));
+  if (badCap) tips.push({ zh: "句首字母要大写", en: badCap[0].toUpperCase() + badCap.slice(1, 60) + (badCap.length > 60 ? "…" : ""), ctx: "「" + badCap.slice(0, 60) + "」" });
+  const mi = text.match(/(^|[\s("'])i([\s,.!?;:'")]|$)/);
+  if (mi) tips.push({ zh: "「我」永远大写为 I", en: "I", ctx: "" });
+  if (wc > 0 && wc < lv.words) {
+    tips.push({ zh: `长度：写了 ${wc} 词，${lv.label.split(" ")[0]} 目标是 ${lv.words} 词。试着多补一个原因或一个细节`, en: "", ctx: "" });
+  }
+  const freq = {};
+  words.map(w => w.toLowerCase()).forEach(w => { if (!STOP.has(w) && w.length > 3) freq[w] = (freq[w] || 0) + 1; });
+  const top = Object.entries(freq).sort((a, b) => b[1] - a[1])[0];
+  if (top && top[1] >= 4) tips.push({ zh: `「${top[0]}」出现了 ${top[1]} 次，试试换个说法或用代词`, en: "", ctx: "" });
+  const longS = sentences.find(s => countWords(s) > 28);
+  if (longS) tips.push({ zh: "有一句超过 28 个词，拆成两句更自然", en: "", ctx: "「" + longS.slice(0, 100) + "…」" });
+  if (sentences.length >= 3 && !LINK_WORDS.test(text)) {
+    tips.push({ zh: "通篇没有连接词，加一两个 because / but / however 会更连贯", en: "because / but / however / for example", ctx: "" });
+  }
+  if (wc >= lv.words && LINK_WORDS.test(text) && !tips.length) {
+    tips.push({ zh: `${wc} 词达标，连接词也用上了，今天状态不错`, en: "", ctx: "", praise: true });
+  }
+  return tips;
+}
+
+function addCard(en, zh, ctx, type = "expr") {
+  state.cards.push({ id: state.nextCardId++, en, zh, ctx, type, step: 0, due: todayKey(), added: todayKey() });
+}
+
+/* ============ AI 深度点评（可选，兼容 OpenAI 格式接口） ============ */
+async function runAiReview(day, btn) {
+  const ai = state.ai || {};
+  if (!ai.base || !ai.key || !ai.model) {
+    alert("先在「记录」页配置 AI 接口：地址、模型、Key（兼容 OpenAI 格式的接口都行）");
+    return;
+  }
+  btn.disabled = true; btn.textContent = "点评中…";
+  try {
+    const resp = await fetch(ai.base.replace(/\/+$/, "") + "/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ai.key },
+      body: JSON.stringify({
+        model: ai.model, temperature: 0.3,
+        messages: [
+          { role: "system", content: "你是英语写作教练。用户每天用英语写一小段话。给出 2-4 条最关键的反馈（语法、用词、地道度），每条一行，格式严格为：中文问题简述 || 正确或更地道的英文表达。不要输出任何其他内容。" },
+          { role: "user", content: "用户级别：" + state.level + "\n\n用户的英语文本：\n" + day.draft },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status + " " + (await resp.text()).slice(0, 120));
+    const data = await resp.json();
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+    const tips = text.split(/\n+/).map(l => l.replace(/^[-*\d.\s、]+/, "")).filter(l => l.includes("||"))
+      .map(l => { const p = l.split("||").map(s => s.trim()); return { zh: p[0], en: p[1] || "", ctx: "" }; });
+    if (!tips.length) throw new Error("AI 返回的格式无法解析");
+    day.feedback = (day.feedback || []).concat(tips);
+    save(); render();
+  } catch (e) {
+    alert("AI 点评失败：" + e.message);
+    btn.disabled = false; btn.textContent = "AI 深度点评";
+  }
+}
+
+function feedbackSection(day) {
+  const tips = day.feedback || [];
+  if (!tips.length) return "";
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div class="section-title" style="margin:0">本次反馈</div>
+        <button class="btn ghost" id="aiBtn">AI 深度点评</button>
+      </div>
+      <p class="hint" style="margin-top:2px">有价值的反馈存成复习点，明天起进入复习队列（也可随表达库一起导给 SuperMemo）。</p>
+      <ul class="tips">
+        ${tips.map((t, i) => `
+          <li>
+            <div class="tip-zh">${t.praise ? "🌟 " : ""}${esc(t.zh)}</div>
+            ${t.en ? `<div class="tip-en">→ ${esc(t.en)}</div>` : ""}
+            ${t.ctx ? `<div class="tip-ctx">${esc(t.ctx)}</div>` : ""}
+            ${t.en && !t.saved ? `<button class="btn" data-tipidx="${i}">存为复习点</button>` : ""}
+            ${t.saved ? `<span class="saved-mark">已存 ✓</span>` : ""}
+          </li>`).join("")}
+      </ul>
+    </div>`;
+}
+function bindFeedback(root, day) {
+  root.querySelectorAll("[data-tipidx]").forEach(b =>
+    b.addEventListener("click", () => {
+      const t = day.feedback[Number(b.dataset.tipidx)];
+      addCard(t.en, t.zh, t.ctx, "fb");
+      t.saved = true; save(); render();
+    }));
+  const aiBtn = $("#aiBtn", root);
+  if (aiBtn) aiBtn.addEventListener("click", () => runAiReview(day, aiBtn));
+}
+function taskFor(level, key, swap = 0) {
+  const list = TASKS[level];
+  const idx = (dayNum(key) + LEVEL_ORDER.indexOf(level) * 7 + swap) % list.length;
+  return list[idx];
+}
+function getDay(key = todayKey()) {
+  return state.days[key];
+}
+function ensureDay(key = todayKey()) {
+  if (!state.days[key]) state.days[key] = { level: state.level, swap: 0, draft: "", done: false, finishedAt: null };
+  return state.days[key];
+}
+function streak() {
+  let n = 0;
+  for (let i = 0; i < 10000; i++) {
+    const d = getDay(todayKey(-i));
+    if (d && d.done) n++;
+    else if (i === 0) continue; // 今天还没做不打断连击
+    else break;
+  }
+  return n;
+}
+function totalDone() { return Object.values(state.days).filter(d => d.done).length; }
+function doneAtLevel(level) { return Object.values(state.days).filter(d => d.done && d.level === level).length; }
+function dueCards() {
+  const t = todayKey();
+  return state.cards.filter(c => c.due <= t);
+}
+function nextLevelOf(level) {
+  const i = LEVEL_ORDER.indexOf(level);
+  return i < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[i + 1] : null;
+}
+
+/* ============ 渲染 ============ */
+let tab = "today";
+let review = null; // {queue:[card], idx, showA}
+
+function render() {
+  const app = $("#app");
+  if (!state.level) { app.innerHTML = viewOnboarding(); bindOnboarding(); return; }
+
+  const s = streak();
+  const due = dueCards().length;
+  app.innerHTML = `
+    <header class="top">
+      <h1>每天用英语</h1>
+      <div class="spacer"></div>
+      <span class="pill streak">🔥 连续 <b>${s}</b> 天</span>
+      <span class="pill level" id="levelBtn" title="点击调整级别">${esc(LEVELS[state.level].label)}</span>
+    </header>
+    <nav class="tabs">
+      <button data-tab="today" class="${tab === "today" ? "active" : ""}">今天</button>
+      <button data-tab="review" class="${tab === "review" ? "active" : ""}">复习${due ? `<span class="badge">${due}</span>` : ""}</button>
+      <button data-tab="cards" class="${tab === "cards" ? "active" : ""}">表达库</button>
+      <button data-tab="me" class="${tab === "me" ? "active" : ""}">记录</button>
+    </nav>
+    <main id="main"></main>`;
+
+  app.querySelectorAll("nav.tabs button").forEach(b =>
+    b.addEventListener("click", () => { tab = b.dataset.tab; if (tab !== "review") review = null; render(); }));
+  $("#levelBtn").addEventListener("click", changeLevel);
+
+  const main = $("#main");
+  if (tab === "today") renderToday(main);
+  else if (tab === "review") renderReview(main);
+  else if (tab === "cards") renderCards(main);
+  else renderMe(main);
+}
+
+/* ---- 首次：选级别 ---- */
+function viewOnboarding() {
+  return `
+    <div class="card" style="margin-top:40px">
+      <h1 style="font-size:22px">每天用英语</h1>
+      <p class="hint" style="margin-top:8px">这不是学英语的工具，是<b>用英语</b>的工具。<br>
+      每天开机弹出，一张任务卡，3-5 分钟说完/写完就走。先选你现在的水平：</p>
+      <div class="level-grid">
+        ${LEVEL_ORDER.map(k => `
+          <button class="level-opt" data-level="${k}">
+            <b>${LEVELS[k].label}</b>
+            <p>${LEVELS[k].desc}</p>
+          </button>`).join("")}
+      </div>
+      <p class="hint">选不准就选低一级——任务能轻松完成，才容易变成习惯。级别随时可以调。</p>
+    </div>`;
+}
+function bindOnboarding() {
+  document.querySelectorAll(".level-opt").forEach(b =>
+    b.addEventListener("click", () => {
+      state.level = b.dataset.level;
+      save(); render();
+    }));
+}
+
+/* ---- 今天 ---- */
+function renderToday(main) {
+  const key = todayKey();
+  const day = ensureDay(key);
+  save();
+  const lv = LEVELS[state.level];
+  const task = taskFor(state.level, key, day.swap || 0);
+
+  let upgradeBanner = "";
+  const nl = nextLevelOf(state.level);
+  if (nl && doneAtLevel(state.level) >= 14) {
+    upgradeBanner = `
+      <div class="banner">
+        <span>你已经在 ${state.level} 用满 ${doneAtLevel(state.level)} 次了，可以试试 ${nl}。</span>
+        <button class="btn" id="upLevel">升到 ${LEVELS[nl].label}</button>
+      </div>`;
+  }
+
+  if (day.done) {
+    main.innerHTML = upgradeBanner + `
+      <div class="card done-hero">
+        <div class="big">✅</div>
+        <h2>今天已经用过了</h2>
+        <p>连续 ${streak()} 天 · 明天开机还会见到我</p>
+      </div>
+      <div class="card">
+        <div class="section-title">今天的任务</div>
+        <div class="hist-text">${esc(day.draft || "（口头任务，无文字记录）")}</div>
+      </div>
+      ${feedbackSection(day)}
+      <div class="card">
+        <div class="section-title">顺手留一条表达？</div>
+        <p class="hint">今天卡壳的、新学的、想以后能脱口而出的，丢进表达库，之后复习或导给 SuperMemo。</p>
+        ${quickAddForm()}
+      </div>`;
+    bindQuickAdd(main);
+    bindFeedback(main, day);
+    const up = $("#upLevel"); if (up) up.addEventListener("click", () => { state.level = nl; save(); render(); });
+    return;
+  }
+
+  const isSpeak = task.t === "说";
+  main.innerHTML = upgradeBanner + `
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span class="task-type">${isSpeak ? "🎙 开口说" : "✍️ 动笔写"}</span>
+        <button class="btn ghost" id="swapBtn" title="换一张任务卡">换一张</button>
+      </div>
+      <div class="task-cn">${esc(task.cn)}</div>
+      <div class="task-en">${esc(task.en)}</div>
+      <div class="task-meta">
+        ${isSpeak ? `建议时长 ≥ ${lv.secs} 秒 · 说完打卡` : `目标 ≥ ${lv.words} 个词 · 写完打卡`}
+      </div>
+      <div style="margin-top:16px" id="doArea"></div>
+    </div>`;
+
+  $("#swapBtn").addEventListener("click", () => {
+    day.swap = (day.swap || 0) + 1;
+    save(); render();
+  });
+  const up = $("#upLevel"); if (up) up.addEventListener("click", () => { state.level = nl; save(); render(); });
+
+  const area = $("#doArea");
+  if (isSpeak) renderSpeakArea(area, day);
+  else renderWriteArea(area, day, lv);
+}
+
+function renderWriteArea(area, day, lv) {
+  area.innerHTML = `
+    <textarea id="draft" placeholder="直接写，别查词典，先写完再说……">${esc(day.draft || "")}</textarea>
+    <div class="wordcount" id="wc"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="finishBtn">完成打卡</button>
+    </div>
+    <p class="hint">写完可以顺手点「复习」把最近存的表达过一遍，两分钟。</p>`;
+  const ta = $("#draft");
+  const wc = $("#wc");
+  const upd = () => {
+    const n = countWords(ta.value);
+    wc.innerHTML = `已写 <b>${n}</b> / ${lv.words} 词` + (n >= lv.words ? " · 够了，打卡吧" : "");
+  };
+  ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
+  upd();
+  $("#finishBtn").addEventListener("click", () => {
+    if (!ta.value.trim() && !confirm("一个字都没写，确定要打卡吗？开口说了也算用，写了更好。")) return;
+    day.draft = ta.value; day.done = true; day.finishedAt = new Date().toISOString();
+    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
+    save(); tab = "today"; render();
+  });
+}
+
+function renderSpeakArea(area, day) {
+  area.innerHTML = `
+    <div class="timer" id="timer">0:00</div>
+    <div class="timer-label">对着空气、手机录音或随便什么人说，重点是出声</div>
+    <div class="btn-row" style="justify-content:center">
+      <button class="btn" id="timerBtn">开始计时</button>
+    </div>
+    <textarea id="draft" style="margin-top:14px;min-height:80px" placeholder="可选：卡壳的地方、刚学会的句子，记一句也是赚">${esc(day.draft || "")}</textarea>
+    <div class="btn-row">
+      <button class="btn primary" id="finishBtn">说完了，打卡</button>
+    </div>`;
+  let secs = 0, timerId = null;
+  const fmt = s => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+  $("#timerBtn").addEventListener("click", e => {
+    if (timerId) { clearInterval(timerId); timerId = null; e.target.textContent = "继续计时"; }
+    else {
+      e.target.textContent = "暂停";
+      timerId = setInterval(() => { secs++; $("#timer").textContent = fmt(secs); }, 1000);
+    }
+  });
+  const ta = $("#draft");
+  ta.addEventListener("input", () => { day.draft = ta.value; save(); });
+  $("#finishBtn").addEventListener("click", () => {
+    if (timerId) clearInterval(timerId);
+    day.draft = ta.value; day.done = true; day.finishedAt = new Date().toISOString();
+    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
+    save(); render();
+  });
+}
+
+/* ---- 快速存表达 ---- */
+function quickAddForm() {
+  return `
+    <div class="grid2" style="margin-top:10px">
+      <input type="text" id="qaEn" placeholder="英文表达，如：cut to the chase">
+      <input type="text" id="qaZh" placeholder="意思/用法，如：开门见山，别绕弯子">
+    </div>
+    <input type="text" id="qaCtx" style="margin-top:10px" placeholder="语境（可选）：你今天想用它说的那句话">
+    <div class="btn-row">
+      <button class="btn primary" id="qaAdd">存进表达库</button>
+    </div>`;
+}
+function bindQuickAdd(root) {
+  const btn = $("#qaAdd", root);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const en = $("#qaEn", root).value.trim();
+    const zh = $("#qaZh", root).value.trim();
+    const ctx = $("#qaCtx", root).value.trim();
+    if (!en || !zh) { alert("英文和意思都要填"); return; }
+    addCard(en, zh, ctx, "expr");
+    save(); render();
+  });
+}
+
+/* ---- 复习 ---- */
+function startReview() {
+  const queue = dueCards();
+  review = { queue, idx: 0, showA: false };
+}
+function gradeCard(card, grade) {
+  // grade: 0 忘了 / 1 模糊 / 2 记得
+  if (grade === 0) { card.step = 1; card.due = todayKey(1); }
+  else if (grade === 1) {
+    const gap = Math.max(1, Math.floor(REVIEW_STEPS[Math.min(card.step, REVIEW_STEPS.length - 1)] / 2));
+    card.due = todayKey(gap);
+  } else {
+    card.step = Math.min(card.step + 1, REVIEW_STEPS.length - 1);
+    card.due = todayKey(REVIEW_STEPS[card.step]);
+  }
+  save();
+}
+function renderReview(main) {
+  const due = dueCards();
+  if (!review) {
+    main.innerHTML = `
+      <div class="card" style="text-align:center;padding:34px 20px">
+        <h2 style="font-size:18px">${due.length ? `有 ${due.length} 条表达等你回忆` : "今天没有到期的表达"}</h2>
+        <p class="hint" style="margin-top:6px">规则：看中文 → 开口说出英文 → 再对答案。<b>说出口</b>才算数。</p>
+        ${due.length ? `<div class="btn-row" style="justify-content:center"><button class="btn primary" id="startRv">开始复习（约 ${Math.max(1, Math.round(due.length * 0.4))} 分钟）</button></div>` : ""}
+        <div class="btn-row" style="justify-content:center">
+          <button class="btn ghost" id="exportSm">导出 SuperMemo 文件</button>
+        </div>
+      </div>`;
+    const st = $("#startRv"); if (st) st.addEventListener("click", () => { startReview(); render(); });
+    $("#exportSm").addEventListener("click", exportSuperMemo);
+    return;
+  }
+  if (review.idx >= review.queue.length) {
+    const n = review.queue.length;
+    review = null;
+    main.innerHTML = `
+      <div class="card done-hero">
+        <div class="big">🎉</div>
+        <h2>${n} 条全部过完</h2>
+        <p>内置复习是轻量的。想上强度，随时把表达库导给 SuperMemo。</p>
+      </div>`;
+    return;
+  }
+  const card = review.queue[review.idx];
+  main.innerHTML = `
+    <div class="card">
+      <div class="hint" style="text-align:center">${review.idx + 1} / ${review.queue.length}</div>
+      <div class="review-q">${esc(card.zh)}</div>
+      ${card.ctx ? `<div class="review-ctx">语境：${esc(card.ctx)}</div>` : ""}
+      ${review.showA
+        ? `<div class="review-a">${esc(card.en)}</div>
+           <div class="grade-row btn-row">
+             <button class="btn danger" data-grade="0">忘了</button>
+             <button class="btn" data-grade="1">模糊</button>
+             <button class="btn primary" data-grade="2">记得</button>
+           </div>`
+        : `<div class="btn-row" style="justify-content:center"><button class="btn primary" id="showA">说出英文后，点我看答案</button></div>`}
+    </div>`;
+  const sa = $("#showA");
+  if (sa) sa.addEventListener("click", () => { review.showA = true; render(); });
+  main.querySelectorAll("[data-grade]").forEach(b =>
+    b.addEventListener("click", () => {
+      gradeCard(card, Number(b.dataset.grade));
+      review.idx++; review.showA = false; render();
+    }));
+}
+
+/* ---- 表达库 ---- */
+function renderCards(main) {
+  const t = todayKey();
+  const sorted = [...state.cards].sort((a, b) => a.due < b.due ? -1 : 1);
+  main.innerHTML = `
+    <div class="card">
+      <div class="section-title">存一条新表达</div>
+      ${quickAddForm()}
+    </div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <div class="section-title" style="margin:0">全部表达（${state.cards.length}）</div>
+        <div class="row">
+          <button class="btn ghost" id="exportSm">导出 SuperMemo</button>
+        </div>
+      </div>
+      ${sorted.length ? `<ul class="list">
+        ${sorted.map(c => `
+          <li>
+            ${c.type === "fb" ? `<span class="tag-fb">反馈</span>` : ""}
+            <span class="en">${esc(c.en)}</span>
+            <span class="zh">${esc(c.zh)}</span>
+            <span class="due ${c.due <= t ? "today" : ""}">${c.due <= t ? "待复习" : c.due + " 见"}</span>
+            <button class="btn ghost danger" data-del="${c.id}" title="删除">×</button>
+          </li>`).join("")}
+      </ul>` : `<div class="empty">还什么都没有。每天打卡后顺手留一条，慢慢就攒起来了。</div>`}
+    </div>`;
+  bindQuickAdd(main);
+  $("#exportSm").addEventListener("click", exportSuperMemo);
+  main.querySelectorAll("[data-del]").forEach(b =>
+    b.addEventListener("click", () => {
+      if (!confirm("删掉这条表达？")) return;
+      state.cards = state.cards.filter(c => c.id !== Number(b.dataset.del));
+      save(); render();
+    }));
+}
+
+function exportSuperMemo() {
+  if (!state.cards.length) { alert("表达库是空的，先存几条。"); return; }
+  // SuperMemo 经典 Q&A 文本格式：File > Import > Q&A text 直接导入
+  const lines = state.cards.map(c => {
+    const a = c.ctx ? `${c.en}\n${c.ctx}` : c.en;
+    return `Q: ${c.zh}\nA: ${a}`;
+  }).join("\n\n");
+  download(lines + "\n", `supermemo-english-${todayKey()}.txt`, "text/plain;charset=utf-8");
+}
+
+/* ---- 记录 ---- */
+function renderMe(main) {
+  const days = Object.entries(state.days)
+    .filter(([, d]) => d.done)
+    .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  main.innerHTML = `
+    <div class="stat-row">
+      <div class="stat amber"><b>${streak()}</b><span>连续天数</span></div>
+      <div class="stat"><b>${totalDone()}</b><span>总打卡</span></div>
+      <div class="stat"><b>${state.cards.length}</b><span>表达库存</span></div>
+    </div>
+    <div class="card">
+      <div class="section-title">AI 深度点评（可选）</div>
+      <div class="grid2">
+        <input type="text" id="aiBase" placeholder="接口地址，如 https://api.openai.com/v1" value="${esc(state.ai.base)}">
+        <input type="text" id="aiModel" placeholder="模型，如 gpt-4o-mini / deepseek-chat" value="${esc(state.ai.model)}">
+      </div>
+      <input type="text" id="aiKey" style="margin-top:10px" placeholder="API Key（只保存在本机浏览器里）" value="${esc(state.ai.key)}">
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" id="aiSave">保存配置</button>
+      </div>
+      <p class="hint">任何兼容 OpenAI 格式的接口都行（OpenAI / OpenRouter / DeepSeek / 本地模型等）。不配也不影响本地点评，本地点评永远离线可用。</p>
+    </div>
+    <div class="card">
+      <div class="section-title">数据备份</div>
+      <div class="btn-row" style="margin-top:4px">
+        <button class="btn" id="backupBtn">导出备份（JSON）</button>
+        <button class="btn" id="restoreBtn">导入备份</button>
+        <input type="file" id="restoreFile" accept=".json" style="display:none">
+      </div>
+      <p class="hint">数据存在这台电脑的浏览器里。换浏览器/重装前记得导出备份。</p>
+    </div>
+    <div class="card">
+      <div class="section-title">历史记录</div>
+      ${days.length ? days.map(([k, d]) => `
+        <div class="hist-item">
+          <div class="hist-head"><b>${k}</b><span>${esc(d.level || "")}</span></div>
+          ${d.draft ? `<div class="hist-text">${esc(d.draft)}</div>` : ""}
+        </div>`).join("") : `<div class="empty">还没有记录，今天就是第一天。</div>`}
+    </div>`;
+  $("#backupBtn").addEventListener("click", () =>
+    download(JSON.stringify(state, null, 2), `daily-english-backup-${todayKey()}.json`, "application/json"));
+  $("#aiSave").addEventListener("click", () => {
+    state.ai = { base: $("#aiBase").value.trim(), model: $("#aiModel").value.trim(), key: $("#aiKey").value.trim() };
+    save(); alert("已保存");
+  });
+  $("#restoreBtn").addEventListener("click", () => $("#restoreFile").click());
+  $("#restoreFile").addEventListener("change", e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!data || typeof data !== "object" || !data.days) throw new Error("bad");
+        state = Object.assign(blankState(), data);
+        save(); alert("恢复成功"); render();
+      } catch { alert("文件格式不对"); }
+    };
+    r.readAsText(f);
+  });
+}
+
+function download(content, filename, mime) {
+  const blob = new Blob(["\ufeff" + content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---- 调整级别 ---- */
+function changeLevel() {
+  const cur = state.level;
+  const pick = prompt(
+    "当前级别：" + LEVELS[cur].label + "\n\n输入新级别（A1 / A2 / B1 / B2 / C1 / C2）：\n" +
+    LEVEL_ORDER.map(k => `${k}：${LEVELS[k].desc}`).join("\n"), cur);
+  if (!pick) return;
+  const v = pick.trim().toUpperCase();
+  if (!LEVELS[v]) { alert("级别无效"); return; }
+  state.level = v; save(); render();
+}
+
+render();
+</script>
+</body>
+</html>
