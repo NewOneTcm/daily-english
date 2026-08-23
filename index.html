@@ -232,91 +232,127 @@ function load() {
 function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
 let state = load();
 
-/* ============ 任务库：全是"真实使用场景" ============ */
+/* ============ 任务库：听说读写四项轮换 ============ */
 const TASKS = {
   A1: [
     { t: "写", cn: "用英语写 3 句自我介绍：名字、城市、一个爱好", en: "Introduce yourself in 3 sentences: name, city, one hobby." },
+    { t: "听", cn: "听两遍（不看原文），说出或写下 Anna 早上做的三件事", en: "Listen twice without reading. What three things does Anna do in the morning?",
+      passage: "Hi, I'm Anna. I live in Beijing. Every morning I get up at seven. I drink coffee and eat bread. Then I go to work by bus." },
     { t: "说", cn: "看着你的桌子，大声说出 5 样东西：There is a ...", en: "Look at your desk. Say 5 things out loud: 'There is a ...'" },
+    { t: "读", cn: "读这封便条，然后用英语说出或写下：什么时候、在哪里、带什么", en: "Read the note, then say or write: when, where, and what to bring.",
+      passage: "Dear Tom, the meeting is at 3 pm on Friday, in Room 202. Please bring your laptop. See you there. — Lisa" },
     { t: "写", cn: "你今天吃了什么？写下来（可以配表情吐槽）", en: "What did you eat today? Write it down." },
+    { t: "听", cn: "听两遍，记下店里三种水果和苹果的价格", en: "Listen twice. Write down the three fruits and the price of apples.",
+      passage: "Welcome to my shop. We have apples, bananas, and oranges. The apples are red and sweet. One kilo of apples is five yuan." },
     { t: "说", cn: "描述今天的天气和你穿的衣服", en: "Describe today's weather and what you are wearing." },
+    { t: "读", cn: "读完这段自我介绍，仿照它写或说两句关于你自己", en: "Read this self-introduction, then say two similar sentences about yourself.",
+      passage: "My name is Marco. I am from Italy. I am a teacher. I like music and football. On Sundays I play football with my friends." },
     { t: "写", cn: "给家人或朋友发一条英文消息，真的发出去", en: "Send a real English message to a friend or family member." },
+    { t: "听", cn: "听两遍：今天天气怎么样？明天呢？说话人打算怎么办？", en: "Listen twice. How is the weather today and tomorrow? What will the speaker do?",
+      passage: "Today is Monday. It is sunny and hot. I wear a T-shirt and shorts. But tomorrow it will rain, so I will take an umbrella." },
     { t: "说", cn: "说出你一天的时间表：I get up at ...", en: "Say your daily schedule out loud." },
-    { t: "写", cn: "列出你房间里 8 样东西的英文，不查词典先写", en: "List 8 things in your room in English. No dictionary first." },
-    { t: "说", cn: "介绍一位家庭成员：TA 是谁、什么样、喜欢什么", en: "Introduce a family member out loud." },
-    { t: "写", cn: "这个周末你打算干嘛？写 3 句（be going to）", en: "Write 3 sentences about your weekend plans." },
-    { t: "说", cn: "假装在咖啡店，大声点一杯你想喝的", en: "Role-play: order a drink out loud." },
-    { t: "写", cn: "你最喜欢的一道菜是什么？为什么？写 3 句", en: "Your favorite food: what and why? 3 sentences." },
-    { t: "说", cn: "你现在在哪？描述你周围看到的东西", en: "Describe where you are right now and what you see." },
+    { t: "读", cn: "读这份咖啡店菜单，用英语点一单：你要什么、一共多少钱", en: "Read the menu, then order in English: what do you want and how much is it?",
+      passage: "Welcome to Sun Cafe. Coffee is three dollars. Tea is two dollars. We also have cakes. The chocolate cake is four dollars. It is very popular." },
   ],
   A2: [
     { t: "写", cn: "昨天你做了什么？写 4-5 句（过去式）", en: "What did you do yesterday? 4-5 sentences, past tense." },
+    { t: "听", cn: "听两遍留言：电影几点开始？几点见面？还要带什么？", en: "Listen twice. When does the movie start? When do they meet? What should Sam bring?",
+      passage: "Hi Sam, it's me. About tomorrow — the movie starts at eight, not seven. Let's meet at the cinema at seven forty-five. Oh, and bring a jacket, it will be cold." },
     { t: "说", cn: "讲一部你看过的电影或剧：讲了什么、你喜不喜欢", en: "Talk about a movie or show you watched." },
+    { t: "读", cn: "读这封邀请邮件，然后写或说一条回复：去还是不去，为什么", en: "Read the invitation, then reply: will you go or not, and why?",
+      passage: "Hi everyone, I'm having a birthday dinner this Saturday at 7 pm at Green Garden Restaurant. Please tell me before Thursday if you can come. — Mia" },
     { t: "写", cn: "给朋友写封邮件，推荐一家你去过的餐厅", en: "Write an email recommending a restaurant to a friend." },
+    { t: "听", cn: "听两遍指路，不看原文复述：先怎么走、在哪转弯、邮局在哪", en: "Listen twice, then repeat the route without reading.",
+      passage: "Go straight for two minutes, then turn left at the bank. The post office is on your right, next to a small park." },
     { t: "说", cn: "比较两个季节或两个你住过的地方，哪个更好", en: "Compare two seasons or two places you lived in." },
+    { t: "读", cn: "读这条差评：一句话总结她为什么不满，再写一句你会问卖家的问题", en: "Read the review: why is she unhappy? What would you ask the seller?",
+      passage: "I bought this bag last month. It looks nice and it is cheap. But after two weeks, the handle broke. I don't think I will buy from this brand again." },
     { t: "写", cn: "回复一条邀请：接受或礼貌拒绝（编一个也行）", en: "Reply to an invitation: accept or politely decline." },
+    { t: "听", cn: "听两遍周末计划：周六上午、下午、周日分别做什么？", en: "Listen twice. What happens Saturday morning, afternoon, and Sunday?",
+      passage: "This weekend I want to try something new. On Saturday morning I will take a cooking class. In the afternoon, I'm going to visit my grandmother. Sunday is for rest — maybe a long walk by the river." },
     { t: "说", cn: "描述你每天上班/上学的路线", en: "Describe your daily commute route." },
-    { t: "写", cn: "你上一次假期去了哪？发生了什么？", en: "Write about your last vacation." },
-    { t: "说", cn: "教一个不会做饭的人做一道你会的菜", en: "Explain how to cook a dish you know." },
-    { t: "写", cn: "一件东西坏了，写一段投诉（网购客服场景）", en: "Write a complaint about a broken product." },
-    { t: "说", cn: "你手机里最常用的 3 个 app，分别用来干嘛", en: "Your top 3 apps: what do you use them for?" },
-    { t: "写", cn: "下周有什么安排？写出来（将来时）", en: "Write your plans for next week." },
-    { t: "说", cn: "打开相册挑一张照片，描述它", en: "Pick a photo from your phone and describe it." },
+    { t: "读", cn: "读这个做法，然后用英语说出制作冷萃咖啡的三个步骤", en: "Read it, then say the three steps of making cold brew in English.",
+      passage: "To make cold brew coffee, put fifty grams of ground coffee in a jar. Add five hundred milliliters of cold water. Wait twelve hours in the fridge. Then filter it and enjoy." },
   ],
   B1: [
     { t: "写", cn: "今天发生的一件有意思（或离谱）的事", en: "Write about one interesting thing that happened today." },
+    { t: "听", cn: "听两遍：他遇到了什么问题？他还没做什么？听完给出你的一条建议", en: "Listen twice. What is his problem? What hasn't he done yet? Then give one piece of advice.",
+      passage: "I'm a bit stressed this week. My manager gave me a big project on Monday, and the deadline is Friday. The problem is, two people from my team are on holiday, so I have to do everything myself. I haven't told my manager yet." },
     { t: "说", cn: "你怎么看远程办公？说 2 分钟你的真实想法", en: "Your honest take on remote work, 2 minutes." },
+    { t: "读", cn: "读这段谈习惯的短文：一句话总结作者观点，再说一个你同不同意的理由", en: "Summarize the author's point in one sentence, then say if you agree.",
+      passage: "Most people fail to build habits because they start too big. They decide to run five kilometers every day, and quit in a week. The trick is to make the first step laughably small — one push-up, one sentence, one minute. Small steps are boring, but they survive bad days." },
     { t: "写", cn: "写一条英文动态总结这一周，可以发出去", en: "Write an English post summarizing your week." },
+    { t: "听", cn: "听两遍旅行故事：手机怎么了？老人做了什么？他觉得什么最棒？", en: "Listen twice. What happened to the phone? What did the old man do? What was the best part?",
+      passage: "Last summer I went to a small town in the mountains. My phone died on the first day, so I couldn't use maps. I asked an old man for directions, and he walked with me for twenty minutes, just chatting. That conversation was the best part of the whole trip." },
     { t: "说", cn: "把你专业里的一个概念讲给完全不懂的人听", en: "Explain a concept from your field to a beginner." },
+    { t: "读", cn: "读这则招聘广告：这份工作哪里吸引你或不吸引你？用 2-3 句英语回应", en: "Read the job ad. What attracts or puts you off? Respond in 2-3 sentences.",
+      passage: "We are looking for a part-time content writer. You will write two short articles per week about technology. You can work from anywhere. Good English is a must. Send us one article you have written." },
     { t: "写", cn: "写封邮件请假或调整会议时间", en: "Write an email asking for leave or rescheduling a meeting." },
+    { t: "听", cn: "听两遍操作说明，不看原文复述完整步骤（3 步 + 在哪找到）", en: "Listen twice, then repeat the full steps without reading.",
+      passage: "To save a video for offline watching, first open the video page. Then tap the three dots in the top right corner. Choose 'Save offline'. You can find all saved videos in your library, under the 'Offline' tab." },
     { t: "说", cn: "你最近做的一个决定：是什么、为什么这么定", en: "A recent decision you made and why." },
-    { t: "写", cn: "推荐一本书/剧/游戏，说服我去看", en: "Recommend a book/show/game and convince me." },
-    { t: "说", cn: "描述一个你佩服的人，TA 哪点打动你", en: "Describe someone you admire and why." },
-    { t: "写", cn: "吐槽一件今天让你不爽的小事，越生动越好", en: "Rant about something that annoyed you today." },
-    { t: "说", cn: "如果明天突然放假一天，你会怎么过", en: "If tomorrow was a free day off, what would you do?" },
-    { t: "写", cn: "写给三个月后的自己几句话", en: "Write a few lines to yourself three months from now." },
-    { t: "说", cn: "现在的你和五年前的你，最大的不同是什么", en: "Compare yourself now with five years ago." },
+    { t: "读", cn: "读这封投诉邮件，假设你是客服，用英语写 2-3 句回复", en: "Read the complaint. You are customer service — reply in 2-3 sentences.",
+      passage: "Dear customer service, I ordered a keyboard on May 3rd and it arrived yesterday, ten days late. Worse, two keys don't work. I would like a replacement or a full refund. This is the second time this has happened. — Daniel" },
   ],
   B2: [
     { t: "写", cn: "挑一个最近的热点话题，写一段你的立场", en: "Pick a trending topic and write your position on it." },
+    { t: "听", cn: "听两遍：作者的核心论点是什么？你认为他低估了远程办公的哪个问题？", en: "Listen twice. What is the core argument? What problem of remote work do you think he underestimates?",
+      passage: "People love to argue about remote work, but here's what the data keeps showing: it's not about where you sit, it's about how clearly the team communicates. A badly-run office is worse than a well-run remote team, and a well-run office beats a chaotic remote one. The location debate is mostly a distraction from the management problem." },
     { t: "说", cn: "辩论题：AI 会让你的工作更好还是更糟？选边站", en: "Debate: will AI make your job better or worse? Pick a side." },
+    { t: "读", cn: "读这段观点：作者用婚姻比喻想说什么？写 2-3 句支持或反驳", en: "Read it. What is the marriage metaphor saying? Support or rebut in 2-3 sentences.",
+      passage: "We romanticize quitting your job to travel, but most people who do it come back within a year — not because travel is bad, but because the thing they were running from is still waiting at home. A sabbatical fixes burnout the way a vacation fixes a bad marriage: temporarily, and only if nothing is actually wrong." },
     { t: "写", cn: "一个犹豫不决的朋友来信，写封建议信", en: "A friend is hesitating over a choice. Write advice." },
+    { t: "听", cn: "听两遍这个故事：政策先怎样、后怎样？这个故事说明了什么？", en: "Listen twice. What happened first, then later? What does the story show?",
+      passage: "A company I know banned meetings on Wednesdays. Productivity went up for a month. Then people started scheduling 'quick syncs' and 'coffee chats' on Wednesdays instead. By the third month, Wednesday was the busiest meeting day of the week. They hadn't removed meetings; they had just renamed them." },
     { t: "说", cn: "讲一次你搞砸的经历，和你学到的东西", en: "Tell a story about a failure and what you learned." },
+    { t: "读", cn: "读这段季报摘要：用英语说出三个要点和团队的建议", en: "Read the report excerpt. Say the three key points and the team's suggestion in English.",
+      passage: "Sales grew 12% this quarter, driven almost entirely by repeat customers. New customer growth was flat for the third quarter in a row. Marketing costs rose 8%, mostly due to higher ad prices. The team suggests shifting budget from ads to the referral program." },
     { t: "写", cn: "给一个产品写一条有理有据的差评", en: "Write a well-argued negative product review." },
+    { t: "听", cn: "听两遍：短视频改变了哪三件事？作者认为它赢在哪一点？", en: "Listen twice. What three things did short video change? Why did it win, according to the speaker?",
+      passage: "Short videos didn't just change entertainment; they changed how products are designed. Apps now open directly into content, search is becoming visual, and even job applications have video versions now. The format won because it removed the one thing people hate most: choosing what to do next." },
     { t: "说", cn: "向外国朋友解释一个中国习俗或网络现象", en: "Explain a Chinese custom or internet phenomenon." },
-    { t: "写", cn: "今天你读到/学到的一个东西，用自己的话总结", en: "Summarize one thing you read or learned today." },
-    { t: "说", cn: "描述你的理想工作日，从早到晚", en: "Describe your ideal workday from morning to night." },
-    { t: "写", cn: "写封邮件向上司争取资源或支持", en: "Write an email to your boss asking for resources." },
-    { t: "说", cn: "如果给你一笔启动资金，你会做什么？为什么", en: "Given seed money, what would you build and why?" },
-    { t: "写", cn: "找一个你不同意的观点，写一段反驳", en: "Find an opinion you disagree with and rebut it." },
-    { t: "说", cn: "讲讲你所在行业最近的一个变化，你怎么看", en: "A recent change in your industry and your take." },
+    { t: "读", cn: "读这段面试故事：为什么面试「太完美」反而是问题？你会问什么来打破局面？", en: "Read it. Why was a 'perfect' interview a problem? What would you ask instead?",
+      passage: "The interview went perfectly, which was exactly the problem. Every answer came out polished and correct, and by the end, the manager realized she had learned nothing about the candidate at all — only about how well he prepared for interviews." },
   ],
   C1: [
     { t: "写", cn: "就「习惯 vs 自律」写一段有立场的短评", en: "Write an opinion piece: habits vs discipline." },
+    { t: "听", cn: "听两遍：作者把注意力比作什么？为什么不是钱？用自己的话复述核心观点", en: "Listen twice. What is attention compared to? Why not money? Retell the core idea in your own words.",
+      passage: "We talk about attention as if it were money — something you spend. But attention is more like a lens: whatever you point it at becomes your reality. Two people can live through the same week and remember entirely different lives, simply because they noticed different things. Managing your attention isn't about productivity; it's about choosing what your life will feel like." },
     { t: "说", cn: "即兴 3 分钟：今天你脑子里出现最多的一个念头", en: "Improvise 3 minutes on today's most recurring thought." },
+    { t: "读", cn: "读这段论述：作者的论证结构是什么？举一个他没想到的好例子或反例", en: "Read it. What is the argument's structure? Give one example or counterexample he missed.",
+      passage: "Efficiency is a trap when applied to things that derive their value from slowness. You cannot speed-run a friendship, a child's trust, or your own understanding of a difficult book. Some things are not tasks to be completed but relationships to be inhabited, and treating them as projects is precisely what destroys them." },
     { t: "写", cn: "挑一个中文网络热梗，用英语解释给老外听", en: "Explain a Chinese internet meme in English." },
+    { t: "听", cn: "听两遍：作者区分了哪两个概念？他的措辞哪里体现了克制（hedging）？", en: "Listen twice. Which two concepts does he separate? Where is his language hedged?",
+      passage: "I'm not saying meetings are useless — that would be an overreaction. What I am saying is that most meetings are status updates wearing the costume of collaboration. If everyone leaves a meeting with the same information they could have read in three minutes, the meeting wasn't collaboration; it was a ritual." },
     { t: "说", cn: "复盘你最近做的一件事：什么有效、什么无效", en: "Debrief a recent project: what worked, what didn't." },
+    { t: "读", cn: "读这段评测：为什么作者不推荐一部各项都优秀的手机？用英语概括这个矛盾", en: "Read it. Why won't he recommend an excellent phone? Sum up the contradiction in English.",
+      passage: "The new phone is excellent in every measurable way — faster, brighter, longer-lasting. And yet I can't recommend it with enthusiasm, because excellence measured in specs has quietly become a tax on attention: every improvement arrives wrapped in one more notification, one more feed, one more reason not to look up." },
     { t: "写", cn: "为你正在做的事写一段 pitch，说服别人加入", en: "Write a pitch for something you're working on." },
+    { t: "听", cn: "听两遍这个陶艺课实验：怎么设计的？结果和寓意？和你每天用英语的方法有何关系？", en: "Listen twice. How was the experiment designed? Result and moral? How does it relate to using English daily?",
+      passage: "A ceramics teacher split his class in two: half would be graded on the quantity of pots they made, half on the quality of a single pot. The best pots all came from the quantity group — because while the perfectionists were theorizing, the others were learning from a mountain of imperfect pots." },
     { t: "说", cn: "讲一件你改变了看法的事，原来怎么想、现在怎么想", en: "Something you changed your mind about." },
-    { t: "写", cn: "给十年前的自己写封信", en: "Write a letter to yourself ten years ago." },
-    { t: "说", cn: "解释一个你持有的反直觉观点", en: "Explain a counterintuitive opinion you hold." },
-    { t: "写", cn: "给你最近在用的一个工具写篇短评测", en: "Write a short review of a tool you use." },
-    { t: "说", cn: "如果要做一场 TED 演讲你讲什么？说出大纲", en: "Your TED talk: topic and outline, out loud." },
-    { t: "写", cn: "写一封措辞讲究的正式投诉信", en: "Write a formal, well-worded complaint letter." },
-    { t: "说", cn: "描述一个你想建立的系统（不是目标）", en: "Describe a system you want to build, not a goal." },
+    { t: "读", cn: "读这段评论：「watch where it pours the concrete」是什么意思？把这个逻辑用到公司或个人身上写 2-3 句", en: "Read it. What does 'watch where it pours the concrete' mean? Apply the logic to a company or a person in 2-3 sentences.",
+      passage: "Every city says it wants to be walkable, and every city builds for cars. The gap between the slogan and the budget is where you find the real values. Don't listen to what a city claims to love; watch where it pours the concrete." },
   ],
   C2: [
     { t: "写", cn: "模仿你最喜欢的作家的风格写一段", en: "Write a passage imitating your favorite author's style." },
+    { t: "听", cn: "听两遍：讽刺点在哪？作者用哪些细节放大荒谬？试着用英语讲给想象中的朋友", en: "Listen twice. Where is the irony? Which details amplify the absurdity? Retell it to an imaginary friend.",
+      passage: "Our office is proudly paperless. We print the paperless policy every quarter and distribute it at the all-hands meeting, so everyone can hold a physical copy of our commitment to not using paper. Attendance is mandatory, and the minutes are circulated as a laminated handout." },
     { t: "说", cn: "挑一个模糊概念（如「内卷」「松弛感」）做精确辨析", en: "Dissect a fuzzy concept with precision, 3 minutes." },
+    { t: "读", cn: "读这段文学性文字：幽默和伤感分别来自哪里？仿写一句你自己的 mirror 句子", en: "Read it. Where do the humor and sadness come from? Imitate it with your own 'mirror' sentence.",
+      passage: "The elevator in his building had a mirror, and he had long ago made peace with the man in it — a reasonable fellow, aging at the agreed-upon rate, who nodded back with the courtesy of a colleague you pass every day but never quite meet." },
     { t: "写", cn: "写一段黑色幽默短文吐槽现代生活", en: "Write a darkly comic piece about modern life." },
+    { t: "听", cn: "听两遍辩论：双方各自的立场和修辞策略？「numbers have a past」是什么意思？", en: "Listen twice. What are both positions and their rhetorical moves? What does 'numbers have a past' mean?",
+      passage: "My opponent calls this a tax cut; I call it a loan from your grandchildren. He says the economy needs stimulus; I say it needs a memory of the last three times we tried this. We agree on the numbers — we simply disagree about whether numbers have a past." },
     { t: "说", cn: "同一件事，用三种方式讲：给孩子、给同事、给专家", en: "Explain one thing three ways: child, colleague, expert." },
+    { t: "读", cn: "读这段论证：解释 disciplinary function 的含义，找一个生活中「给模糊定价」会改变行为的例子", en: "Read it. Explain the disciplinary function, and find a real-life example where pricing vagueness would change behavior.",
+      passage: "Prediction markets are praised for aggregating information, yet their deeper function may be disciplinary: they do not make us smarter so much as they make vagueness expensive. Once a belief has a price, metaphors retire early and hedging loses its charm." },
     { t: "写", cn: "为一个你深信的观点写最强的反方论证", en: "Steel-man the opposite of something you believe." },
+    { t: "听", cn: "听两遍：复述宽容悖论的论证链，把「tolerance as a border」这个比喻讲明白", en: "Listen twice. Retell the argument chain and explain the 'tolerance as a border' metaphor.",
+      passage: "The paradox of tolerance states that a tolerant society must be intolerant of intolerance, or it will be consumed by it. Notice the asymmetry: tolerance is not a peace treaty between ideas, it is a peace treaty that requires enforcement — which makes it less like openness and more like a border." },
     { t: "说", cn: "把今天一个尴尬瞬间讲成一个好笑的故事", en: "Turn an awkward moment today into a funny story." },
-    { t: "写", cn: "给一个英文播客/作者写封有观点的反馈邮件", en: "Write thoughtful feedback to an English podcast or writer." },
-    { t: "说", cn: "谈谈语言如何影响你的思维方式", en: "How does language shape the way you think?" },
-    { t: "写", cn: "写一个短篇故事的开头，150 词以内", en: "Write the opening of a short story, under 150 words." },
-    { t: "说", cn: "为你做过的一个有争议的选择辩护", en: "Defend a controversial choice you made." },
-    { t: "写", cn: "把你专业里一个难概念写成一段优雅的科普", en: "Turn a hard concept from your field into elegant prose." },
-    { t: "说", cn: "如果人生可以 A/B 测试，你想测什么", en: "If you could A/B test your life, what would you test?" },
+    { t: "读", cn: "读这段讽刺：它讽刺了哪两件事的合谋？用英语解释笑点，并造一个同类句子", en: "Read it. What two things conspire here? Explain the joke in English and write a similar sentence.",
+      passage: "The company announced a bold new wellness initiative: employees may now meditate for up to four minutes per day, tracked through the productivity dashboard. HR clarified that mindfulness scores will be a small but meaningful factor in year-end reviews, to ensure the practice is taken seriously." },
   ],
 };
 
@@ -491,6 +527,9 @@ function nextLevelOf(level) {
   return i < LEVEL_ORDER.length - 1 ? LEVEL_ORDER[i + 1] : null;
 }
 
+const SKILL_BADGE = { "听": "🎧 听力", "说": "🎙 开口说", "读": "📖 阅读", "写": "✍️ 动笔写" };
+const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
+
 /* ============ 渲染 ============ */
 let tab = "today";
 let review = null; // {queue:[card], idx, showA}
@@ -593,18 +632,20 @@ function renderToday(main) {
     return;
   }
 
-  const isSpeak = task.t === "说";
+  const metaText =
+    task.t === "说" ? `建议时长 ≥ ${lv.secs} 秒 · 说完打卡` :
+    task.t === "写" ? `目标 ≥ ${lv.words} 个词 · 写完打卡` :
+    task.t === "听" ? "先别看原文，盲听 2-3 遍，再完成检验" :
+    "读完后用英语回应（写或说都算）";
   main.innerHTML = upgradeBanner + `
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <span class="task-type">${isSpeak ? "🎙 开口说" : "✍️ 动笔写"}</span>
+        <span class="task-type">${SKILL_BADGE[task.t] || task.t}</span>
         <button class="btn ghost" id="swapBtn" title="换一张任务卡">换一张</button>
       </div>
       <div class="task-cn">${esc(task.cn)}</div>
       <div class="task-en">${esc(task.en)}</div>
-      <div class="task-meta">
-        ${isSpeak ? `建议时长 ≥ ${lv.secs} 秒 · 说完打卡` : `目标 ≥ ${lv.words} 个词 · 写完打卡`}
-      </div>
+      <div class="task-meta">${metaText}</div>
       <div style="margin-top:16px" id="doArea"></div>
     </div>`;
 
@@ -615,11 +656,13 @@ function renderToday(main) {
   const up = $("#upLevel"); if (up) up.addEventListener("click", () => { state.level = nl; save(); render(); });
 
   const area = $("#doArea");
-  if (isSpeak) renderSpeakArea(area, day);
-  else renderWriteArea(area, day, lv);
+  if (task.t === "听") renderListenArea(area, day, task);
+  else if (task.t === "说") renderSpeakArea(area, day, task);
+  else if (task.t === "读") renderReadArea(area, day, lv, task);
+  else renderWriteArea(area, day, lv, task);
 }
 
-function renderWriteArea(area, day, lv) {
+function renderWriteArea(area, day, lv, task) {
   area.innerHTML = `
     <textarea id="draft" placeholder="直接写，别查词典，先写完再说……">${esc(day.draft || "")}</textarea>
     <div class="wordcount" id="wc"></div>
@@ -637,13 +680,13 @@ function renderWriteArea(area, day, lv) {
   upd();
   $("#finishBtn").addEventListener("click", () => {
     if (!ta.value.trim() && !confirm("一个字都没写，确定要打卡吗？开口说了也算用，写了更好。")) return;
-    day.draft = ta.value; day.done = true; day.finishedAt = new Date().toISOString();
+    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
     if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
     save(); tab = "today"; render();
   });
 }
 
-function renderSpeakArea(area, day) {
+function renderSpeakArea(area, day, task) {
   area.innerHTML = `
     <div class="timer" id="timer">0:00</div>
     <div class="timer-label">对着空气、手机录音或随便什么人说，重点是出声</div>
@@ -667,9 +710,75 @@ function renderSpeakArea(area, day) {
   ta.addEventListener("input", () => { day.draft = ta.value; save(); });
   $("#finishBtn").addEventListener("click", () => {
     if (timerId) clearInterval(timerId);
-    day.draft = ta.value; day.done = true; day.finishedAt = new Date().toISOString();
+    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
     if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
     save(); render();
+  });
+}
+
+function renderListenArea(area, day, task) {
+  const rate = SPEECH_RATE[state.level] || 1;
+  area.innerHTML = `
+    <div class="row" style="justify-content:center;gap:12px;margin:4px 0 2px">
+      <button class="btn primary" id="playBtn">▶ 播放</button>
+      <button class="btn ghost" id="showTextBtn">显示原文</button>
+    </div>
+    <p class="hint" style="text-align:center">语速 ×${rate} · 先别看原文，听 2-3 遍</p>
+    <div id="passageBox" class="hist-text" style="display:none;margin-top:10px">${esc(task.passage)}</div>
+    <textarea id="draft" style="margin-top:12px;min-height:80px" placeholder="检验区：回答问题 / 写下听到的关键点 / 复述大意…">${esc(day.draft || "")}</textarea>
+    <div class="btn-row">
+      <button class="btn primary" id="finishBtn">听完了，打卡</button>
+    </div>`;
+  const playBtn = $("#playBtn");
+  playBtn.addEventListener("click", () => {
+    if (!window.speechSynthesis) { alert("当前浏览器不支持语音播放，换 Edge 或 Chrome 试试"); return; }
+    if (speechSynthesis.speaking) { speechSynthesis.cancel(); playBtn.textContent = "▶ 播放"; return; }
+    const u = new SpeechSynthesisUtterance(task.passage);
+    u.lang = "en-US"; u.rate = rate;
+    const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith("en"));
+    if (v) u.voice = v;
+    u.onend = () => { playBtn.textContent = "▶ 再听一遍"; };
+    speechSynthesis.speak(u);
+    playBtn.textContent = "⏸ 停止";
+  });
+  $("#showTextBtn").addEventListener("click", () => {
+    const box = $("#passageBox");
+    const show = box.style.display === "none";
+    box.style.display = show ? "block" : "none";
+    $("#showTextBtn").textContent = show ? "收起原文" : "显示原文";
+  });
+  const ta = $("#draft");
+  ta.addEventListener("input", () => { day.draft = ta.value; save(); });
+  $("#finishBtn").addEventListener("click", () => {
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
+    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
+    save(); render();
+  });
+}
+
+function renderReadArea(area, day, lv, task) {
+  const target = Math.max(10, Math.round(lv.words / 2));
+  area.innerHTML = `
+    <div class="hist-text" style="margin-bottom:12px">${esc(task.passage)}</div>
+    <textarea id="draft" placeholder="用英语回应：复述、表态、仿写都可以…">${esc(day.draft || "")}</textarea>
+    <div class="wordcount" id="wc"></div>
+    <div class="btn-row">
+      <button class="btn primary" id="finishBtn">完成打卡</button>
+    </div>`;
+  const ta = $("#draft");
+  const wc = $("#wc");
+  const upd = () => {
+    const n = countWords(ta.value);
+    wc.innerHTML = `回应 <b>${n}</b> / ${target} 词` + (n >= target ? " · 够了，打卡吧" : "");
+  };
+  ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
+  upd();
+  $("#finishBtn").addEventListener("click", () => {
+    if (!ta.value.trim() && !confirm("还没写回应，直接打卡？口头复述过了也行。")) return;
+    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
+    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
+    save(); tab = "today"; render();
   });
 }
 
@@ -818,11 +927,19 @@ function renderMe(main) {
   const days = Object.entries(state.days)
     .filter(([, d]) => d.done)
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  const skills = { "听": 0, "说": 0, "读": 0, "写": 0 };
+  days.forEach(([, d]) => { if (d.skill) skills[d.skill] = (skills[d.skill] || 0) + 1; });
   main.innerHTML = `
     <div class="stat-row">
       <div class="stat amber"><b>${streak()}</b><span>连续天数</span></div>
       <div class="stat"><b>${totalDone()}</b><span>总打卡</span></div>
       <div class="stat"><b>${state.cards.length}</b><span>表达库存</span></div>
+    </div>
+    <div class="stat-row">
+      <div class="stat"><b>${skills["听"]}</b><span>🎧 听</span></div>
+      <div class="stat"><b>${skills["说"]}</b><span>🎙 说</span></div>
+      <div class="stat"><b>${skills["读"]}</b><span>📖 读</span></div>
+      <div class="stat"><b>${skills["写"]}</b><span>✍️ 写</span></div>
     </div>
     <div class="card">
       <div class="section-title">AI 深度点评（可选）</div>
@@ -833,7 +950,9 @@ function renderMe(main) {
       <input type="text" id="aiKey" style="margin-top:10px" placeholder="API Key（只保存在本机浏览器里）" value="${esc(state.ai.key)}">
       <div class="btn-row" style="margin-top:10px">
         <button class="btn" id="aiSave">保存配置</button>
+        <button class="btn" id="aiTest">测试连接</button>
       </div>
+      <div class="ai-status" id="aiTestResult"></div>
       <p class="hint">任何兼容 OpenAI 格式的接口都行（OpenAI / OpenRouter / DeepSeek / 本地模型等）。不配也不影响本地点评，本地点评永远离线可用。</p>
     </div>
     <div class="card">
@@ -849,7 +968,7 @@ function renderMe(main) {
       <div class="section-title">历史记录</div>
       ${days.length ? days.map(([k, d]) => `
         <div class="hist-item">
-          <div class="hist-head"><b>${k}</b><span>${esc(d.level || "")}</span></div>
+          <div class="hist-head"><b>${k}</b><span>${esc(d.level || "")}${d.skill ? " · " + esc(SKILL_BADGE[d.skill] || d.skill) : ""}</span></div>
           ${d.draft ? `<div class="hist-text">${esc(d.draft)}</div>` : ""}
         </div>`).join("") : `<div class="empty">还没有记录，今天就是第一天。</div>`}
     </div>`;
@@ -858,6 +977,32 @@ function renderMe(main) {
   $("#aiSave").addEventListener("click", () => {
     state.ai = { base: $("#aiBase").value.trim(), model: $("#aiModel").value.trim(), key: $("#aiKey").value.trim() };
     save(); alert("已保存");
+  });
+  $("#aiTest").addEventListener("click", async () => {
+    const base = $("#aiBase").value.trim(), model = $("#aiModel").value.trim(), key = $("#aiKey").value.trim();
+    const out = $("#aiTestResult");
+    const show = (msg, ok) => { out.textContent = msg; out.style.color = ok ? "var(--accent)" : "var(--red)"; };
+    if (!base || !model || !key) { show("⚠ 接口地址、模型、Key 三个都要填", false); return; }
+    show("测试中…", true);
+    const t0 = Date.now();
+    try {
+      const resp = await fetch(base.replace(/\/+$/, "") + "/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
+        body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "Reply with exactly: ok" }] }),
+      });
+      const ms = Date.now() - t0;
+      if (!resp.ok) {
+        const txt = (await resp.text()).slice(0, 150);
+        show(`✗ 连接失败：HTTP ${resp.status} — ${txt}`, false);
+        return;
+      }
+      const data = await resp.json();
+      const reply = (((data.choices || [])[0] || {}).message || {}).content || "";
+      show(`✓ 连接成功（${ms}ms），模型回复：${String(reply).trim().slice(0, 40) || "(空回复)"}`, true);
+    } catch (e) {
+      show(`✗ 请求失败：${e.message}（网络不通、地址写错或跨域被拦截）`, false);
+    }
   });
   $("#restoreBtn").addEventListener("click", () => $("#restoreFile").click());
   $("#restoreFile").addEventListener("change", e => {
