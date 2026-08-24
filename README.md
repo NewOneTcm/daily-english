@@ -30,7 +30,7 @@
 
 ## 使用
 
-1. 双击 `index.html`（或等开机自动弹出），首次选择英语级别（A1-C2），选不准就选低一级
+1. 开机自动弹出（通过本机中转 `http://127.0.0.1:8787/` 打开），首次选择英语级别（A1-C2），选不准就选低一级
 2. 每天打开：看任务卡 → 说/写 → 打卡 → 顺手存一条表达
 3. 打卡后看「本次反馈」：本地点评自动标出错误并给出正确说法，有价值的点「存为复习点」
 4. 表达和复习点到期后「复习」标签会出现红色角标，看中文说英文，两分钟过完
@@ -40,10 +40,23 @@
 
 - **本地点评**（离线，零配置）：15+ 条中国学习者高频错误规则（三单、不可数名词、although/but 混用、because/so 混用等）+ 长度、重复用词、长句、连接词、大小写检查
 - **AI 深度点评**（可选）：「记录」页配置接口地址 + 模型 + API Key，支持任何 OpenAI 格式接口；配置后先点「测试连接」确认通畅
+  - **Kimi Code 会员**：接口地址填 `http://127.0.0.1:8787/v1`，模型 `k3-256k`（按会员档位，也可 `kimi-for-coding`），Key 用会员 Key。会员端点 `api.kimi.com/coding` 不允许浏览器跨域直连，所以走本机中转 `proxy.py`（开机自启；页面也从这个中转地址打开，天然同源）
   - Kimi：`https://api.moonshot.cn/v1`，模型如 `kimi-k2-0905-preview`
   - DeepSeek：`https://api.deepseek.com/v1`，模型 `deepseek-chat`
   - OpenRouter：`https://openrouter.ai/api/v1`
   - 注意地址只填到 `/v1`，不要带 `/chat/completions`
+
+## 本地中转（proxy.py）
+
+浏览器直连部分 API（如 Kimi 会员端点）会被跨域/私网访问策略拦截。`proxy.py` 在本机 8787 端口做两件事：
+
+1. 把 `/v1/*` 请求转发到目标 API（默认 `https://api.kimi.com/coding`），补上跨域许可头
+2. 托管应用页面本身（`http://127.0.0.1:8787/`），页面与 API 同源，彻底无跨域问题
+
+只监听 127.0.0.1，不对外开放，不记录任何内容。已加入开机启动（`DailyEnglishProxy.lnk`）。
+要转发到其他服务：`python proxy.py https://api.deepseek.com`。
+
+注意：从双击 `index.html`（file://）切换到 `http://127.0.0.1:8787/` 后，浏览器本地数据是新空间；旧数据可在旧页面「记录」页导出 JSON 备份，再到新页面导入。
 - 两类反馈都可以存为复习点，进入「看中文回忆正确英文表达」的复习流程；复习点在表达库中带「反馈」标签
 - AI Key 只保存在本机浏览器 localStorage，注意它会包含在导出的 JSON 备份里
 
@@ -61,9 +74,11 @@
 
 ## 文件
 
-- `index.html` — 全部应用（HTML + CSS + JS，单文件）
+- `index.html` — 全部应用（HTML + CSS + JS，单文件，双击也能跑）
+- `proxy.py` — 本机中转（转发 API + 托管页面），解决浏览器跨域限制
+- `open.bat` — 开机启动入口，打开 http://127.0.0.1:8787/
 - `README.md` — 本文件
-- 开机启动项：`shell:startup` 里的 `DailyEnglish.lnk` 快捷方式
+- 开机启动项：`shell:startup` 里的 `DailyEnglish.lnk`（打开应用）和 `DailyEnglishProxy.lnk`（启动中转）
 
 ## 任务库
 

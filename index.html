@@ -220,7 +220,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, ai: { base: "", key: "", model: "" } };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -229,8 +229,33 @@ function load() {
     return Object.assign(blankState(), JSON.parse(raw));
   } catch (e) { return blankState(); }
 }
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function save() {
+  state.updatedAt = Date.now();
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if (syncEnabled) {
+    // 同步落盘到本地文件，换浏览器/换打开方式都不丢数据
+    fetch(SYNC_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state) }).catch(() => {});
+  }
+}
 let state = load();
+
+/* ============ 数据落盘同步（proxy.py 提供，可选） ============ */
+const SYNC_URL = location.protocol === "file:" ? "http://127.0.0.1:8787/data" : "/data";
+let syncEnabled = false;
+async function syncPull() {
+  try {
+    const r = await fetch(SYNC_URL, { cache: "no-store" });
+    syncEnabled = true;
+    if (!r.ok) return;
+    const remote = await r.json();
+    if (!remote || typeof remote !== "object" || !remote.days) return;
+    if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
+      state = Object.assign(blankState(), remote);
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      render();
+    }
+  } catch (e) { /* 中转没启动就只存浏览器，不影响使用 */ }
+}
 
 /* ============ 任务库：听说读写四项轮换 ============ */
 const TASKS = {
@@ -431,17 +456,24 @@ function addCard(en, zh, ctx, type = "expr") {
 /* ============ AI 深度点评（可选，兼容 OpenAI 格式接口） ============ */
 async function runAiReview(day, btn) {
   const ai = state.ai || {};
-  if (!ai.base || !ai.key || !ai.model) {
-    alert("先在「记录」页配置 AI 接口：地址、模型、Key（兼容 OpenAI 格式的接口都行）");
+  if (!ai.base || !ai.model || (!ai.key && !/^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base))) {
+    alert("先在「记录」页配置 AI 接口：地址和模型必填，本机地址可不填 Key");
+    return;
+  }
+  const localBase = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base);
+  if (location.protocol === "file:" && localBase) {
+    alert("AI 点评需要在本机中转地址下使用：请打开 http://127.0.0.1:8787/ （开机自启的入口就是它）");
     return;
   }
   btn.disabled = true; btn.textContent = "点评中…";
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (ai.key) headers["Authorization"] = "Bearer " + ai.key;
     const resp = await fetch(ai.base.replace(/\/+$/, "") + "/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ai.key },
+      headers,
       body: JSON.stringify({
-        model: ai.model, temperature: 0.3,
+        model: ai.model,
         messages: [
           { role: "system", content: "你是英语写作教练。用户每天用英语写一小段话。给出 2-4 条最关键的反馈（语法、用词、地道度），每条一行，格式严格为：中文问题简述 || 正确或更地道的英文表达。不要输出任何其他内容。" },
           { role: "user", content: "用户级别：" + state.level + "\n\n用户的英语文本：\n" + day.draft },
@@ -457,7 +489,14 @@ async function runAiReview(day, btn) {
     day.feedback = (day.feedback || []).concat(tips);
     save(); render();
   } catch (e) {
-    alert("AI 点评失败：" + e.message);
+    // HTTP 错误说明中转和鉴权都通了，是模型侧拒绝了参数；网络级错误才是中转没起来
+    const isHttpError = /^HTTP \d/.test(e.message);
+    const hint = isHttpError
+      ? "接口已连通，以上是模型返回的错误，按其提示调整配置即可。"
+      : localBase
+      ? "本机中转（127.0.0.1:8787）没响应。它已设置开机自启；如果刚开机稍等几秒刷新重试，仍不行就到项目目录运行 python proxy.py 手动拉起。"
+      : "网络不通、地址写错或跨域被拦截。";
+    alert("AI 点评失败：" + e.message + "\n\n" + hint);
     btn.disabled = false; btn.textContent = "AI 深度点评";
   }
 }
@@ -943,17 +982,23 @@ function renderMe(main) {
     </div>
     <div class="card">
       <div class="section-title">AI 深度点评（可选）</div>
+      ${location.protocol === "file:" ? `
+      <div class="banner" style="margin-bottom:10px">
+        <span>AI 点评在本机中转地址下才能用（从文件直接打开的页面会被浏览器拦截请求）。</span>
+        <a class="btn primary" href="http://127.0.0.1:8787/">切换到 http://127.0.0.1:8787/</a>
+      </div>` : ""}
       <div class="grid2">
         <input type="text" id="aiBase" placeholder="接口地址，如 https://api.openai.com/v1" value="${esc(state.ai.base)}">
         <input type="text" id="aiModel" placeholder="模型，如 gpt-4o-mini / deepseek-chat" value="${esc(state.ai.model)}">
       </div>
       <input type="text" id="aiKey" style="margin-top:10px" placeholder="API Key（只保存在本机浏览器里）" value="${esc(state.ai.key)}">
       <div class="btn-row" style="margin-top:10px">
+        <button class="btn" id="aiFillKimi">一键填 Kimi 会员</button>
         <button class="btn" id="aiSave">保存配置</button>
         <button class="btn" id="aiTest">测试连接</button>
       </div>
       <div class="ai-status" id="aiTestResult"></div>
-      <p class="hint">任何兼容 OpenAI 格式的接口都行。常用地址：Kimi → https://api.moonshot.cn/v1（模型 kimi-k2-0905-preview）· DeepSeek → https://api.deepseek.com/v1（模型 deepseek-chat）· OpenRouter → https://openrouter.ai/api/v1。注意地址只填到 /v1。不配也不影响本地点评，本地点评永远离线可用。</p>
+      <p class="hint">任何兼容 OpenAI 格式的接口都行。Kimi 会员 → http://127.0.0.1:8787/v1（走本机中转，模型按档位填 kimi-for-coding 或 k3-256k）· Moonshot 开放平台 → https://api.moonshot.cn/v1 · DeepSeek → https://api.deepseek.com/v1 · OpenRouter → https://openrouter.ai/api/v1。地址只填到 /v1。不配也不影响本地点评，本地点评永远离线可用。</p>
     </div>
     <div class="card">
       <div class="section-title">数据备份</div>
@@ -978,19 +1023,31 @@ function renderMe(main) {
     state.ai = { base: $("#aiBase").value.trim(), model: $("#aiModel").value.trim(), key: $("#aiKey").value.trim() };
     save(); alert("已保存");
   });
+  $("#aiFillKimi").addEventListener("click", () => {
+    $("#aiBase").value = "http://127.0.0.1:8787/v1";
+    $("#aiModel").value = "k3-256k";
+    $("#aiTestResult").textContent = "已填好 Kimi 会员地址和模型，只需粘贴 Key，然后点「测试连接」";
+    $("#aiTestResult").style.color = "var(--accent)";
+  });
   $("#aiTest").addEventListener("click", async () => {
     const base = $("#aiBase").value.trim(), model = $("#aiModel").value.trim(), key = $("#aiKey").value.trim();
     const out = $("#aiTestResult");
     const show = (msg, ok) => { out.textContent = msg; out.style.color = ok ? "var(--accent)" : "var(--red)"; };
-    if (!base || !model || !key) { show("⚠ 接口地址、模型、Key 三个都要填", false); return; }
+    const isLocal = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(base);
+    if (!base || !model || (!key && !isLocal)) { show("⚠ 接口地址和模型必填；本机地址（127.0.0.1）可不填 Key，其他服务必须填", false); return; }
     if (/\/chat\/completions\/?$/i.test(base)) { show("⚠ 地址填到 /v1 为止，不要带 /chat/completions（工具会自动拼）", false); return; }
+    if (location.protocol === "file:" && isLocal) {
+      show("⚠ 当前是从文件直接打开的页面，浏览器会拦截本机请求。请点上方链接切换到 http://127.0.0.1:8787/ 再测", false); return;
+    }
     show("测试中…", true);
     const t0 = Date.now();
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (key) headers["Authorization"] = "Bearer " + key;
       const resp = await fetch(base.replace(/\/+$/, "") + "/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-        body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "Reply with exactly: ok" }] }),
+        headers,
+        body: JSON.stringify({ model, max_tokens: 50, messages: [{ role: "user", content: "Reply with exactly: ok" }] }),
       });
       const ms = Date.now() - t0;
       if (!resp.ok) {
@@ -999,7 +1056,8 @@ function renderMe(main) {
         return;
       }
       const data = await resp.json();
-      const reply = (((data.choices || [])[0] || {}).message || {}).content || "";
+      const msg0 = (((data.choices || [])[0] || {}).message) || {};
+      const reply = msg0.content || msg0.reasoning_content || "";
       show(`✓ 连接成功（${ms}ms），模型回复：${String(reply).trim().slice(0, 40) || "(空回复)"}`, true);
     } catch (e) {
       show(`✗ 请求失败：${e.message}（网络不通、地址写错或跨域被拦截）`, false);
@@ -1044,6 +1102,7 @@ function changeLevel() {
 }
 
 render();
+syncPull();
 </script>
 </body>
 </html>
