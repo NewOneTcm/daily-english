@@ -191,6 +191,31 @@
   .stat b { display: block; font-size: 24px; color: var(--accent); }
   .stat span { font-size: 12px; color: var(--ink-2); }
   .stat.amber b { color: var(--amber); }
+
+  /* 自主加练 */
+  .skill-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  @media (max-width: 560px) { .skill-grid { grid-template-columns: repeat(2, 1fr); } }
+  .skill-opt {
+    border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel);
+    padding: 16px 8px; cursor: pointer; text-align: center; font-family: inherit;
+  }
+  .skill-opt:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .skill-opt b { font-size: 16px; color: var(--accent); display: block; }
+  .skill-opt span { display: block; font-size: 12px; color: var(--ink-2); margin-top: 4px; }
+
+  /* 学习战果登记（步进器） */
+  .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  @media (max-width: 420px) { .report-grid { grid-template-columns: 1fr; } }
+  .report-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 8px; text-align: center; background: #fbfcfb; }
+  .report-label { font-size: 13px; color: var(--ink-2); }
+  .stepper { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 8px; }
+  .step-btn { padding: 2px 12px; font-size: 16px; line-height: 1.3; }
+  .step-val { font-size: 20px; color: var(--accent); min-width: 30px; display: inline-block; font-variant-numeric: tabular-nums; }
+
+  /* 统计图表 */
+  .chart-svg { width: 100%; height: auto; display: block; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 8px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 </style>
 </head>
 <body>
@@ -220,7 +245,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, ai: { base: "", key: "", model: "" } };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -229,8 +254,33 @@ function load() {
     return Object.assign(blankState(), JSON.parse(raw));
   } catch (e) { return blankState(); }
 }
-function save() { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+function save() {
+  state.updatedAt = Date.now();
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  if (syncEnabled) {
+    // 同步落盘到本地文件，换浏览器/换打开方式都不丢数据
+    fetch(SYNC_URL, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state) }).catch(() => {});
+  }
+}
 let state = load();
+
+/* ============ 数据落盘同步（proxy.py 提供，可选） ============ */
+const SYNC_URL = location.protocol === "file:" ? "http://127.0.0.1:8787/data" : "/data";
+let syncEnabled = false;
+async function syncPull() {
+  try {
+    const r = await fetch(SYNC_URL, { cache: "no-store" });
+    syncEnabled = true;
+    if (!r.ok) return;
+    const remote = await r.json();
+    if (!remote || typeof remote !== "object" || !remote.days) return;
+    if ((remote.updatedAt || 0) > (state.updatedAt || 0)) {
+      state = Object.assign(blankState(), remote);
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      render();
+    }
+  } catch (e) { /* 中转没启动就只存浏览器，不影响使用 */ }
+}
 
 /* ============ 任务库：听说读写四项轮换 ============ */
 const TASKS = {
@@ -431,17 +481,24 @@ function addCard(en, zh, ctx, type = "expr") {
 /* ============ AI 深度点评（可选，兼容 OpenAI 格式接口） ============ */
 async function runAiReview(day, btn) {
   const ai = state.ai || {};
-  if (!ai.base || !ai.key || !ai.model) {
-    alert("先在「记录」页配置 AI 接口：地址、模型、Key（兼容 OpenAI 格式的接口都行）");
+  if (!ai.base || !ai.model || (!ai.key && !/^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base))) {
+    alert("先在「记录」页配置 AI 接口：地址和模型必填，本机地址可不填 Key");
+    return;
+  }
+  const localBase = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base);
+  if (location.protocol === "file:" && localBase) {
+    alert("AI 点评需要在本机中转地址下使用：请打开 http://127.0.0.1:8787/ （开机自启的入口就是它）");
     return;
   }
   btn.disabled = true; btn.textContent = "点评中…";
   try {
+    const headers = { "Content-Type": "application/json" };
+    if (ai.key) headers["Authorization"] = "Bearer " + ai.key;
     const resp = await fetch(ai.base.replace(/\/+$/, "") + "/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + ai.key },
+      headers,
       body: JSON.stringify({
-        model: ai.model, temperature: 0.3,
+        model: ai.model,
         messages: [
           { role: "system", content: "你是英语写作教练。用户每天用英语写一小段话。给出 2-4 条最关键的反馈（语法、用词、地道度），每条一行，格式严格为：中文问题简述 || 正确或更地道的英文表达。不要输出任何其他内容。" },
           { role: "user", content: "用户级别：" + state.level + "\n\n用户的英语文本：\n" + day.draft },
@@ -457,7 +514,14 @@ async function runAiReview(day, btn) {
     day.feedback = (day.feedback || []).concat(tips);
     save(); render();
   } catch (e) {
-    alert("AI 点评失败：" + e.message);
+    // HTTP 错误说明中转和鉴权都通了，是模型侧拒绝了参数；网络级错误才是中转没起来
+    const isHttpError = /^HTTP \d/.test(e.message);
+    const hint = isHttpError
+      ? "接口已连通，以上是模型返回的错误，按其提示调整配置即可。"
+      : localBase
+      ? "本机中转（127.0.0.1:8787）没响应。它已设置开机自启；如果刚开机稍等几秒刷新重试，仍不行就到项目目录运行 python proxy.py 手动拉起。"
+      : "网络不通、地址写错或跨域被拦截。";
+    alert("AI 点评失败：" + e.message + "\n\n" + hint);
     btn.disabled = false; btn.textContent = "AI 深度点评";
   }
 }
@@ -533,6 +597,8 @@ const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
 /* ============ 渲染 ============ */
 let tab = "today";
 let review = null; // {queue:[card], idx, showA}
+let extraPick = null; // 自主加练进行中：{skill, idx, startedAt, draft}
+let extraDone = null; // 刚完成的加练会话，停留在战果登记页
 
 function render() {
   const app = $("#app");
@@ -549,8 +615,10 @@ function render() {
     </header>
     <nav class="tabs">
       <button data-tab="today" class="${tab === "today" ? "active" : ""}">今天</button>
+      <button data-tab="extra" class="${tab === "extra" ? "active" : ""}">加练</button>
       <button data-tab="review" class="${tab === "review" ? "active" : ""}">复习${due ? `<span class="badge">${due}</span>` : ""}</button>
       <button data-tab="cards" class="${tab === "cards" ? "active" : ""}">表达库</button>
+      <button data-tab="stats" class="${tab === "stats" ? "active" : ""}">统计</button>
       <button data-tab="me" class="${tab === "me" ? "active" : ""}">记录</button>
     </nav>
     <main id="main"></main>`;
@@ -561,8 +629,10 @@ function render() {
 
   const main = $("#main");
   if (tab === "today") renderToday(main);
+  else if (tab === "extra") renderExtra(main);
   else if (tab === "review") renderReview(main);
   else if (tab === "cards") renderCards(main);
+  else if (tab === "stats") renderStats(main);
   else renderMe(main);
 }
 
@@ -614,7 +684,10 @@ function renderToday(main) {
       <div class="card done-hero">
         <div class="big">✅</div>
         <h2>今天已经用过了</h2>
-        <p>连续 ${streak()} 天 · 明天开机还会见到我</p>
+        <p>连续 ${streak()} 天${day.secs ? " · 用时 " + fmtMins(day.secs) : ""} · 明天开机还会见到我</p>
+        <div class="btn-row" style="justify-content:center">
+          <button class="btn" id="goExtra">意犹未尽？去加练</button>
+        </div>
       </div>
       <div class="card">
         <div class="section-title">今天的任务</div>
@@ -622,12 +695,19 @@ function renderToday(main) {
       </div>
       ${feedbackSection(day)}
       <div class="card">
+        <div class="section-title">今天学到了什么？</div>
+        <p class="hint">新学的单词 / 短语 / 句子记个数，「统计」页会把它画成你的成就曲线。</p>
+        ${learnReportForm(day)}
+      </div>
+      <div class="card">
         <div class="section-title">顺手留一条表达？</div>
         <p class="hint">今天卡壳的、新学的、想以后能脱口而出的，丢进表达库，之后复习或导给 SuperMemo。</p>
         ${quickAddForm()}
       </div>`;
     bindQuickAdd(main);
     bindFeedback(main, day);
+    bindLearnReport(main, day);
+    $("#goExtra").addEventListener("click", () => { tab = "extra"; render(); });
     const up = $("#upLevel"); if (up) up.addEventListener("click", () => { state.level = nl; save(); render(); });
     return;
   }
@@ -655,6 +735,7 @@ function renderToday(main) {
   });
   const up = $("#upLevel"); if (up) up.addEventListener("click", () => { state.level = nl; save(); render(); });
 
+  day.startedAt = Date.now(); // 计时基准：本次进入任务页的时间，切走再切回会重置
   const area = $("#doArea");
   if (task.t === "听") renderListenArea(area, day, task);
   else if (task.t === "说") renderSpeakArea(area, day, task);
@@ -662,7 +743,7 @@ function renderToday(main) {
   else renderWriteArea(area, day, lv, task);
 }
 
-function renderWriteArea(area, day, lv, task) {
+function renderWriteArea(area, day, lv, task, extra) {
   area.innerHTML = `
     <textarea id="draft" placeholder="直接写，别查词典，先写完再说……">${esc(day.draft || "")}</textarea>
     <div class="wordcount" id="wc"></div>
@@ -679,14 +760,14 @@ function renderWriteArea(area, day, lv, task) {
   ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
   upd();
   $("#finishBtn").addEventListener("click", () => {
-    if (!ta.value.trim() && !confirm("一个字都没写，确定要打卡吗？开口说了也算用，写了更好。")) return;
-    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
-    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
-    save(); tab = "today"; render();
+    if (!ta.value.trim() && !confirm(extra ? "一个字都没写，确定结束这次加练吗？" : "一个字都没写，确定要打卡吗？开口说了也算用，写了更好。")) return;
+    day.draft = ta.value;
+    if (extra) { finishExtra(day, task, 0); return; }
+    finishDaily(day, task, 0);
   });
 }
 
-function renderSpeakArea(area, day, task) {
+function renderSpeakArea(area, day, task, extra) {
   area.innerHTML = `
     <div class="timer" id="timer">0:00</div>
     <div class="timer-label">对着空气、手机录音或随便什么人说，重点是出声</div>
@@ -710,13 +791,13 @@ function renderSpeakArea(area, day, task) {
   ta.addEventListener("input", () => { day.draft = ta.value; save(); });
   $("#finishBtn").addEventListener("click", () => {
     if (timerId) clearInterval(timerId);
-    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
-    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
-    save(); render();
+    day.draft = ta.value;
+    if (extra) { finishExtra(day, task, secs); return; }
+    finishDaily(day, task, secs);
   });
 }
 
-function renderListenArea(area, day, task) {
+function renderListenArea(area, day, task, extra) {
   const rate = SPEECH_RATE[state.level] || 1;
   area.innerHTML = `
     <div class="row" style="justify-content:center;gap:12px;margin:4px 0 2px">
@@ -751,13 +832,13 @@ function renderListenArea(area, day, task) {
   ta.addEventListener("input", () => { day.draft = ta.value; save(); });
   $("#finishBtn").addEventListener("click", () => {
     if (window.speechSynthesis) speechSynthesis.cancel();
-    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
-    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
-    save(); render();
+    day.draft = ta.value;
+    if (extra) { finishExtra(day, task, 0); return; }
+    finishDaily(day, task, 0);
   });
 }
 
-function renderReadArea(area, day, lv, task) {
+function renderReadArea(area, day, lv, task, extra) {
   const target = Math.max(10, Math.round(lv.words / 2));
   area.innerHTML = `
     <div class="hist-text" style="margin-bottom:12px">${esc(task.passage)}</div>
@@ -775,11 +856,255 @@ function renderReadArea(area, day, lv, task) {
   ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
   upd();
   $("#finishBtn").addEventListener("click", () => {
-    if (!ta.value.trim() && !confirm("还没写回应，直接打卡？口头复述过了也行。")) return;
-    day.draft = ta.value; day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
-    if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
-    save(); tab = "today"; render();
+    if (!ta.value.trim() && !confirm(extra ? "还没写回应，结束这次加练？口头复述过了也行。" : "还没写回应，直接打卡？口头复述过了也行。")) return;
+    day.draft = ta.value;
+    if (extra) { finishExtra(day, task, 0); return; }
+    finishDaily(day, task, 0);
   });
+}
+
+/* ---- 完成与计时 ---- */
+function computeSecs(rec, timerSecs) {
+  const elapsed = rec.startedAt ? Math.round((Date.now() - rec.startedAt) / 1000) : 0;
+  const t = Number(timerSecs) || 0;
+  // 开口任务优先用计时器（真实开口时长）；其余用页面停留时长，上限 4 小时防挂机
+  const v = t > 0 ? t : elapsed;
+  return Math.min(v, 4 * 3600);
+}
+function finishDaily(day, task, timerSecs) {
+  day.secs = computeSecs(day, timerSecs);
+  delete day.startedAt;
+  day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
+  if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
+  save(); render();
+}
+function finishExtra(rec, task, timerSecs) {
+  state.nextSessionId = state.nextSessionId || (state.sessions.length + 1);
+  const s = {
+    id: state.nextSessionId++,
+    date: todayKey(),
+    skill: task.t,
+    secs: computeSecs(rec, timerSecs),
+    nw: 0, np: 0, ns: 0,
+    draft: rec.draft || "",
+    finishedAt: new Date().toISOString(),
+  };
+  state.sessions.push(s);
+  save();
+  extraDone = s; extraPick = null; render();
+}
+
+/* ---- 自主加练 ---- */
+function extraTaskFor(skill, idx) {
+  const list = TASKS[state.level].filter(t => t.t === skill);
+  return list[((idx % list.length) + list.length) % list.length];
+}
+function renderExtra(main) {
+  if (extraDone) { renderExtraDone(main); return; }
+  if (!extraPick) { renderExtraPick(main); return; }
+  renderExtraTask(main);
+}
+function renderExtraPick(main) {
+  const t = dayStats(todayKey());
+  main.innerHTML = `
+    <div class="card">
+      <div class="section-title">自主加练</div>
+      <p class="hint">每日打卡照旧；想多练的时候来这儿，听说读写任选一项。加练不限次数，时长和新学内容都会计入「统计」。</p>
+      <div class="skill-grid">
+        <button class="skill-opt" data-skill="听"><b>🎧 听</b><span>盲听短文</span></button>
+        <button class="skill-opt" data-skill="说"><b>🎙 说</b><span>开口 + 计时</span></button>
+        <button class="skill-opt" data-skill="读"><b>📖 读</b><span>短文 + 回应</span></button>
+        <button class="skill-opt" data-skill="写"><b>✍️ 写</b><span>场景写作</span></button>
+      </div>
+      ${t.sessions || t.secs ? `<p class="hint" style="margin-top:14px">今天已加练 <b>${t.sessions}</b> 次 · 今日累计学习 ${fmtMins(t.secs)}。再来一项？</p>` : ""}
+    </div>`;
+  main.querySelectorAll(".skill-opt").forEach(b =>
+    b.addEventListener("click", () => {
+      const list = TASKS[state.level].filter(t => t.t === b.dataset.skill);
+      extraPick = { skill: b.dataset.skill, idx: Math.floor(Math.random() * list.length), startedAt: Date.now(), draft: "" };
+      render();
+    }));
+}
+function renderExtraTask(main) {
+  const task = extraTaskFor(extraPick.skill, extraPick.idx);
+  const lv = LEVELS[state.level];
+  extraPick.startedAt = Date.now(); // 切走再切回来不计空白时间
+  const metaText =
+    task.t === "说" ? `建议时长 ≥ ${lv.secs} 秒 · 说完结束` :
+    task.t === "写" ? `目标 ≥ ${lv.words} 个词 · 自动计时` :
+    task.t === "听" ? "先别看原文，盲听 2-3 遍，再完成检验" :
+    "读完后用英语回应（写或说都算）";
+  main.innerHTML = `
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <span class="task-type">${SKILL_BADGE[task.t] || task.t} · 加练</span>
+        <div class="row">
+          <button class="btn ghost" id="swapBtn">换一张</button>
+          <button class="btn ghost danger" id="quitBtn">不练了</button>
+        </div>
+      </div>
+      <div class="task-cn">${esc(task.cn)}</div>
+      <div class="task-en">${esc(task.en)}</div>
+      <div class="task-meta">${metaText}</div>
+      <div style="margin-top:16px" id="doArea"></div>
+    </div>`;
+  $("#swapBtn").addEventListener("click", () => { extraPick.idx++; render(); });
+  $("#quitBtn").addEventListener("click", () => {
+    if (extraPick.draft && extraPick.draft.trim() && !confirm("这次还没记完，确定放弃？")) return;
+    extraPick = null; render();
+  });
+  const area = $("#doArea");
+  if (task.t === "听") renderListenArea(area, extraPick, task, true);
+  else if (task.t === "说") renderSpeakArea(area, extraPick, task, true);
+  else if (task.t === "读") renderReadArea(area, extraPick, lv, task, true);
+  else renderWriteArea(area, extraPick, lv, task, true);
+}
+function renderExtraDone(main) {
+  const s = extraDone;
+  main.innerHTML = `
+    <div class="card done-hero">
+      <div class="big">🎉</div>
+      <h2>加练完成 · ${SKILL_BADGE[s.skill] || s.skill}</h2>
+      <p>用时 ${fmtMins(s.secs)} · 已计入「统计」</p>
+    </div>
+    <div class="card">
+      <div class="section-title">这次学到了什么？</div>
+      <p class="hint">新学的单词 / 短语 / 句子分别记个数，点几下就行。</p>
+      ${learnReportForm(s)}
+    </div>
+    ${s.draft && s.draft.trim() ? `
+    <div class="card">
+      <div class="section-title">这次的文字</div>
+      <div class="hist-text">${esc(s.draft)}</div>
+    </div>` : ""}
+    <div class="card">
+      <div class="section-title">顺手留一条表达？</div>
+      ${quickAddForm()}
+    </div>
+    <div class="btn-row">
+      <button class="btn primary" id="againBtn">再练一项</button>
+      <button class="btn" id="backToday">回到今天</button>
+    </div>`;
+  bindLearnReport(main, s);
+  bindQuickAdd(main);
+  $("#againBtn").addEventListener("click", () => { extraDone = null; extraPick = null; render(); });
+  $("#backToday").addEventListener("click", () => { extraDone = null; extraPick = null; tab = "today"; render(); });
+}
+
+/* ---- 学习战果登记（步进器） ---- */
+function learnReportForm(target) {
+  const f = (label, key) => `
+    <div class="report-item">
+      <span class="report-label">新学${label}</span>
+      <div class="stepper">
+        <button class="btn ghost step-btn" data-step="${key}" data-d="-1">−</button>
+        <b class="step-val" data-val="${key}">${target[key] || 0}</b>
+        <button class="btn ghost step-btn" data-step="${key}" data-d="1">＋</button>
+      </div>
+    </div>`;
+  return `<div class="report-grid">${f("单词", "nw")}${f("短语", "np")}${f("句子", "ns")}</div>`;
+}
+function bindLearnReport(root, target) {
+  root.querySelectorAll(".step-btn").forEach(b =>
+    b.addEventListener("click", () => {
+      const k = b.dataset.step, d = Number(b.dataset.d);
+      target[k] = Math.max(0, (target[k] || 0) + d);
+      root.querySelector(`[data-val="${k}"]`).textContent = target[k];
+      save();
+    }));
+}
+
+/* ---- 统计 ---- */
+function fmtMins(secs) {
+  const m = Math.round((secs || 0) / 60);
+  if (m < 60) return m + " 分钟";
+  return Math.floor(m / 60) + " 小时 " + (m % 60) + " 分";
+}
+function dayStats(key) {
+  let secs = 0, nw = 0, np = 0, ns = 0, sessions = 0;
+  const d = state.days[key];
+  if (d && d.done) { secs += d.secs || 0; nw += d.nw || 0; np += d.np || 0; ns += d.ns || 0; }
+  (state.sessions || []).forEach(s => {
+    if (s.date === key) { secs += s.secs || 0; nw += s.nw || 0; np += s.np || 0; ns += s.ns || 0; sessions++; }
+  });
+  return { secs, nw, np, ns, sessions };
+}
+function allTotals() {
+  let secs = 0, nw = 0, np = 0, ns = 0, done = 0, sessions = 0;
+  Object.values(state.days).forEach(d => {
+    if (d && d.done) { done++; secs += d.secs || 0; nw += d.nw || 0; np += d.np || 0; ns += d.ns || 0; }
+  });
+  (state.sessions || []).forEach(s => { sessions++; secs += s.secs || 0; nw += s.nw || 0; np += s.np || 0; ns += s.ns || 0; });
+  return { secs, nw, np, ns, done, sessions };
+}
+function svgBarChart(rows, series, opts = {}) {
+  const W = 620, H = 240, padL = 40, padR = 8, padT = 20, padB = 30;
+  const n = rows.length, bw = (W - padL - padR) / n;
+  const totals = rows.map(r => series.reduce((a, s) => a + (r[s.key] || 0), 0));
+  const rawMax = Math.max(opts.min || 1, ...totals);
+  const step = Math.max(1, Math.ceil(rawMax / 4));
+  const top = Math.ceil(rawMax / step) * step;
+  const yv = v => padT + (H - padT - padB) * (1 - v / top);
+  let svg = "";
+  for (let v = step; v <= top; v += step) {
+    svg += `<line x1="${padL}" y1="${yv(v).toFixed(1)}" x2="${W - padR}" y2="${yv(v).toFixed(1)}" stroke="#e3e7e4"/>` +
+      `<text x="${padL - 6}" y="${(yv(v) + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="#8a938e">${v}</text>`;
+  }
+  svg += `<line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#c8cfcb"/>`;
+  rows.forEach((r, i) => {
+    const x = padL + i * bw + 2, w = bw - 4;
+    let acc = 0;
+    series.forEach(s => {
+      const v = r[s.key] || 0;
+      if (v > 0) {
+        const y1 = yv(acc + v), y2 = yv(acc);
+        svg += `<rect x="${x.toFixed(1)}" y="${y1.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(2, y2 - y1).toFixed(1)}" rx="2" fill="${s.color}"/>`;
+      }
+      acc += v;
+    });
+    if (totals[i] > 0) svg += `<text x="${(x + w / 2).toFixed(1)}" y="${(yv(totals[i]) - 5).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="600" fill="#5c6660">${totals[i]}${opts.unit || ""}</text>`;
+    svg += `<text x="${(x + w / 2).toFixed(1)}" y="${H - padB + 14}" text-anchor="middle" font-size="9.5" fill="#8a938e">${r.k.slice(5).replace("-", "/")}</text>`;
+  });
+  return `<svg class="chart-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">${svg}</svg>`;
+}
+function renderStats(main) {
+  const tot = allTotals();
+  const today = dayStats(todayKey());
+  const keys = []; for (let i = 13; i >= 0; i--) keys.push(todayKey(-i));
+  const rows = keys.map(k => Object.assign({ k }, dayStats(k)));
+  const durRows = rows.map(r => ({ k: r.k, m: Math.ceil((r.secs || 0) / 60) }));
+  const items = tot.nw + tot.np + tot.ns;
+  const dayToday = state.days[todayKey()];
+  main.innerHTML = `
+    <div class="stat-row">
+      <div class="stat amber"><b>${Math.round(tot.secs / 60)}</b><span>累计学习（分钟）</span></div>
+      <div class="stat"><b>${tot.nw}</b><span>新学单词</span></div>
+      <div class="stat"><b>${tot.np}</b><span>新学短语</span></div>
+      <div class="stat"><b>${tot.ns}</b><span>新学句子</span></div>
+    </div>
+    <div class="card">
+      <div class="section-title">近 14 天学习时长（分钟 / 天）</div>
+      ${svgBarChart(durRows, [{ key: "m", color: "#17795b" }], { min: 5 })}
+      <p class="hint">打卡 + 加练都算。每天几分钟，柱子连成一片就是你的坚持。</p>
+    </div>
+    <div class="card">
+      <div class="section-title">近 14 天新学内容（条 / 天）</div>
+      <div class="legend">
+        <span><i style="background:#17795b"></i>单词</span>
+        <span><i style="background:#d97b1e"></i>短语</span>
+        <span><i style="background:#4a7fa5"></i>句子</span>
+      </div>
+      ${svgBarChart(rows, [
+        { key: "nw", color: "#17795b" },
+        { key: "np", color: "#d97b1e" },
+        { key: "ns", color: "#4a7fa5" },
+      ], { min: 4 })}
+    </div>
+    <div class="card">
+      <div class="section-title">今天</div>
+      <p style="font-size:14px">学习 ${fmtMins(today.secs)} · 打卡${dayToday && dayToday.done ? " ✓" : " ✗"} · 加练 ${today.sessions} 次 · 新学 ${today.nw + today.np + today.ns} 条</p>
+      ${items ? `<p class="hint" style="margin-top:6px">开工至今攒下 <b style="color:var(--accent)">${items}</b> 个新表达（${tot.nw} 词 · ${tot.np} 短语 · ${tot.ns} 句），总时长 ${fmtMins(tot.secs)}。慢慢来，比较快。</p>` : `<p class="hint" style="margin-top:6px">学完在「今天」或「加练」页记一笔新学内容，这里就会长出你的成就曲线。</p>`}
+    </div>`;
 }
 
 /* ---- 快速存表达 ---- */
@@ -929,10 +1254,17 @@ function renderMe(main) {
     .sort((a, b) => (a[0] < b[0] ? 1 : -1));
   const skills = { "听": 0, "说": 0, "读": 0, "写": 0 };
   days.forEach(([, d]) => { if (d.skill) skills[d.skill] = (skills[d.skill] || 0) + 1; });
+  (state.sessions || []).forEach(s => { if (s.skill) skills[s.skill] = (skills[s.skill] || 0) + 1; });
+  const tot = allTotals();
+  const hist = [
+    ...days.map(([k, d]) => ({ k, level: d.level, skill: d.skill, draft: d.draft, secs: d.secs, extra: false })),
+    ...(state.sessions || []).map(s => ({ k: s.date, level: "", skill: s.skill, draft: s.draft, secs: s.secs, extra: true })),
+  ].sort((a, b) => (a.k < b.k ? 1 : -1));
   main.innerHTML = `
     <div class="stat-row">
       <div class="stat amber"><b>${streak()}</b><span>连续天数</span></div>
       <div class="stat"><b>${totalDone()}</b><span>总打卡</span></div>
+      <div class="stat"><b>${tot.sessions}</b><span>总加练</span></div>
       <div class="stat"><b>${state.cards.length}</b><span>表达库存</span></div>
     </div>
     <div class="stat-row">
@@ -941,19 +1273,26 @@ function renderMe(main) {
       <div class="stat"><b>${skills["读"]}</b><span>📖 读</span></div>
       <div class="stat"><b>${skills["写"]}</b><span>✍️ 写</span></div>
     </div>
+    <p class="hint" style="margin-top:-8px">四科分布含每日打卡与自主加练。</p>
     <div class="card">
       <div class="section-title">AI 深度点评（可选）</div>
+      ${location.protocol === "file:" ? `
+      <div class="banner" style="margin-bottom:10px">
+        <span>AI 点评在本机中转地址下才能用（从文件直接打开的页面会被浏览器拦截请求）。</span>
+        <a class="btn primary" href="http://127.0.0.1:8787/">切换到 http://127.0.0.1:8787/</a>
+      </div>` : ""}
       <div class="grid2">
         <input type="text" id="aiBase" placeholder="接口地址，如 https://api.openai.com/v1" value="${esc(state.ai.base)}">
         <input type="text" id="aiModel" placeholder="模型，如 gpt-4o-mini / deepseek-chat" value="${esc(state.ai.model)}">
       </div>
       <input type="text" id="aiKey" style="margin-top:10px" placeholder="API Key（只保存在本机浏览器里）" value="${esc(state.ai.key)}">
       <div class="btn-row" style="margin-top:10px">
+        <button class="btn" id="aiFillKimi">一键填 Kimi 会员</button>
         <button class="btn" id="aiSave">保存配置</button>
         <button class="btn" id="aiTest">测试连接</button>
       </div>
       <div class="ai-status" id="aiTestResult"></div>
-      <p class="hint">任何兼容 OpenAI 格式的接口都行。常用地址：Kimi → https://api.moonshot.cn/v1（模型 kimi-k2-0905-preview）· DeepSeek → https://api.deepseek.com/v1（模型 deepseek-chat）· OpenRouter → https://openrouter.ai/api/v1。注意地址只填到 /v1。不配也不影响本地点评，本地点评永远离线可用。</p>
+      <p class="hint">任何兼容 OpenAI 格式的接口都行。Kimi 会员 → http://127.0.0.1:8787/v1（走本机中转，模型按档位填 kimi-for-coding 或 k3-256k）· Moonshot 开放平台 → https://api.moonshot.cn/v1 · DeepSeek → https://api.deepseek.com/v1 · OpenRouter → https://openrouter.ai/api/v1。地址只填到 /v1。不配也不影响本地点评，本地点评永远离线可用。</p>
     </div>
     <div class="card">
       <div class="section-title">数据备份</div>
@@ -966,10 +1305,10 @@ function renderMe(main) {
     </div>
     <div class="card">
       <div class="section-title">历史记录</div>
-      ${days.length ? days.map(([k, d]) => `
+      ${hist.length ? hist.map(h => `
         <div class="hist-item">
-          <div class="hist-head"><b>${k}</b><span>${esc(d.level || "")}${d.skill ? " · " + esc(SKILL_BADGE[d.skill] || d.skill) : ""}</span></div>
-          ${d.draft ? `<div class="hist-text">${esc(d.draft)}</div>` : ""}
+          <div class="hist-head"><b>${h.k}</b><span>${h.extra ? `<span class="tag-fb" style="background:var(--accent-soft);color:var(--accent)">加练</span> ` : ""}${esc(h.level || "")}${h.skill ? " · " + esc(SKILL_BADGE[h.skill] || h.skill) : ""}${h.secs ? " · " + fmtMins(h.secs) : ""}</span></div>
+          ${h.draft ? `<div class="hist-text">${esc(h.draft)}</div>` : ""}
         </div>`).join("") : `<div class="empty">还没有记录，今天就是第一天。</div>`}
     </div>`;
   $("#backupBtn").addEventListener("click", () =>
@@ -978,19 +1317,31 @@ function renderMe(main) {
     state.ai = { base: $("#aiBase").value.trim(), model: $("#aiModel").value.trim(), key: $("#aiKey").value.trim() };
     save(); alert("已保存");
   });
+  $("#aiFillKimi").addEventListener("click", () => {
+    $("#aiBase").value = "http://127.0.0.1:8787/v1";
+    $("#aiModel").value = "k3-256k";
+    $("#aiTestResult").textContent = "已填好 Kimi 会员地址和模型，只需粘贴 Key，然后点「测试连接」";
+    $("#aiTestResult").style.color = "var(--accent)";
+  });
   $("#aiTest").addEventListener("click", async () => {
     const base = $("#aiBase").value.trim(), model = $("#aiModel").value.trim(), key = $("#aiKey").value.trim();
     const out = $("#aiTestResult");
     const show = (msg, ok) => { out.textContent = msg; out.style.color = ok ? "var(--accent)" : "var(--red)"; };
-    if (!base || !model || !key) { show("⚠ 接口地址、模型、Key 三个都要填", false); return; }
+    const isLocal = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(base);
+    if (!base || !model || (!key && !isLocal)) { show("⚠ 接口地址和模型必填；本机地址（127.0.0.1）可不填 Key，其他服务必须填", false); return; }
     if (/\/chat\/completions\/?$/i.test(base)) { show("⚠ 地址填到 /v1 为止，不要带 /chat/completions（工具会自动拼）", false); return; }
+    if (location.protocol === "file:" && isLocal) {
+      show("⚠ 当前是从文件直接打开的页面，浏览器会拦截本机请求。请点上方链接切换到 http://127.0.0.1:8787/ 再测", false); return;
+    }
     show("测试中…", true);
     const t0 = Date.now();
     try {
+      const headers = { "Content-Type": "application/json" };
+      if (key) headers["Authorization"] = "Bearer " + key;
       const resp = await fetch(base.replace(/\/+$/, "") + "/chat/completions", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + key },
-        body: JSON.stringify({ model, max_tokens: 5, messages: [{ role: "user", content: "Reply with exactly: ok" }] }),
+        headers,
+        body: JSON.stringify({ model, max_tokens: 50, messages: [{ role: "user", content: "Reply with exactly: ok" }] }),
       });
       const ms = Date.now() - t0;
       if (!resp.ok) {
@@ -999,7 +1350,8 @@ function renderMe(main) {
         return;
       }
       const data = await resp.json();
-      const reply = (((data.choices || [])[0] || {}).message || {}).content || "";
+      const msg0 = (((data.choices || [])[0] || {}).message) || {};
+      const reply = msg0.content || msg0.reasoning_content || "";
       show(`✓ 连接成功（${ms}ms），模型回复：${String(reply).trim().slice(0, 40) || "(空回复)"}`, true);
     } catch (e) {
       show(`✗ 请求失败：${e.message}（网络不通、地址写错或跨域被拦截）`, false);
@@ -1044,6 +1396,7 @@ function changeLevel() {
 }
 
 render();
+syncPull();
 </script>
 </body>
 </html>
