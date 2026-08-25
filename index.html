@@ -946,6 +946,7 @@ function finishExtra(rec, task, timerSecs) {
     id: state.nextSessionId++,
     date: todayKey(),
     skill: task.t,
+    cn: task.cn || "",
     secs: computeSecs(rec, timerSecs),
     nw: 0, np: 0, ns: 0,
     draft: rec.draft || "",
@@ -963,39 +964,32 @@ function extraTaskFor(skill, idx) {
   const list = TASKS[state.level].filter(t => t.t === skill);
   return list[((idx % list.length) + list.length) % list.length];
 }
-/* 抽卡去重：同一技能下，一轮内不重复；一轮练完自动开新一轮。
-   今天打卡那张卡也不会出现在加练里。 */
-function extraPickIdx(skill) {
+/* 抽卡去重：同一技能下按「没练过的优先 → 都练过按最久没练的轮换」抽卡，
+   一轮内不重复；今天打卡那张卡也不会出现在加练里。 */
+function extraDailyIdx(skill, list) {
+  const dt = taskFor(state.level, todayKey(), (getDay(todayKey()) || { swap: 0 }).swap || 0);
+  return (dt && dt.t === skill) ? list.indexOf(dt) : -1;
+}
+function extraNextIdx(skill, excludeIdx = null) {
   state.extraSeen = state.extraSeen || {};
   const key = state.level + ":" + skill;
   const list = TASKS[state.level].filter(t => t.t === skill);
-  const seen = new Set(state.extraSeen[key] || []);
-  const dt = taskFor(state.level, todayKey(), (getDay(todayKey()) || { swap: 0 }).swap || 0);
-  const dailyIdx = list.indexOf(dt);
-  let avail = list.map((_, i) => i).filter(i => !seen.has(i) && i !== dailyIdx);
-  if (!avail.length) {
-    state.extraSeen[key] = []; // 开启新一轮
-    avail = list.map((_, i) => i).filter(i => i !== dailyIdx);
-    if (!avail.length) avail = list.map((_, i) => i);
-  }
-  const idx = avail[Math.floor(Math.random() * avail.length)];
-  state.extraSeen[key] = (state.extraSeen[key] || []).concat(idx);
+  const dailyIdx = extraDailyIdx(skill, list);
+  const seen = state.extraSeen[key] || [];
+  const unseen = list.map((_, i) => i).filter(i => !seen.includes(i));
+  // seen 数组本就是「最久没练 → 最近练过」有序，直接取最久没练的优先
+  let order = [...unseen, ...seen].filter(i => i !== dailyIdx && i !== excludeIdx);
+  if (!order.length) order = list.map((_, i) => i).filter(i => i !== excludeIdx);
+  const idx = order[0];
+  // LRU 环：把刚抽的移到末尾
+  state.extraSeen[key] = [...seen.filter(i => i !== idx), idx];
   return idx;
 }
+function extraPickIdx(skill) {
+  return extraNextIdx(skill, null);
+}
 function extraSwapIdx(pick) {
-  state.extraSeen = state.extraSeen || {};
-  const key = state.level + ":" + pick.skill;
-  const list = TASKS[state.level].filter(t => t.t === pick.skill);
-  if (list.length < 2) return pick.idx; // 只有一张卡，换不了
-  const seen = new Set((state.extraSeen[key] || []).filter(i => i !== pick.idx));
-  let avail = list.map((_, i) => i).filter(i => !seen.has(i) && i !== pick.idx);
-  if (!avail.length) {
-    state.extraSeen[key] = [pick.idx]; // 新一轮，只记住当前这张
-    avail = list.map((_, i) => i).filter(i => i !== pick.idx);
-  }
-  const idx = avail[Math.floor(Math.random() * avail.length)];
-  state.extraSeen[key] = (state.extraSeen[key] || []).concat(idx);
-  return idx;
+  return extraNextIdx(pick.skill, pick.idx);
 }
 function renderExtra(main) {
   if (extraDone) { renderExtraDone(main); return; }
@@ -1698,7 +1692,7 @@ function renderMe(main) {
   const tot = allTotals();
   const hist = [
     ...days.map(([k, d]) => ({ k, level: d.level, skill: d.skill, draft: d.draft, secs: d.secs, extra: false })),
-    ...(state.sessions || []).map(s => ({ k: s.date, level: "", skill: s.skill, draft: s.draft, secs: s.secs, extra: true })),
+    ...(state.sessions || []).map(s => ({ k: s.date, level: "", skill: s.skill, cn: s.cn, draft: s.draft, secs: s.secs, extra: true, sid: s.id })),
   ].sort((a, b) => (a.k < b.k ? 1 : -1));
   main.innerHTML = `
     <div class="stat-row">
@@ -1748,11 +1742,18 @@ function renderMe(main) {
       ${hist.length ? hist.map(h => `
         <div class="hist-item">
           <div class="hist-head"><b>${h.k}</b><span>${h.extra ? `<span class="tag-fb" style="background:var(--accent-soft);color:var(--accent)">加练</span> ` : ""}${esc(h.level || "")}${h.skill ? " · " + esc(SKILL_BADGE[h.skill] || h.skill) : ""}${h.secs ? " · " + fmtMins(h.secs) : ""}</span></div>
+          ${h.cn ? `<div class="hint" style="margin-top:2px">${esc(h.cn)}</div>` : ""}
           ${h.draft ? `<div class="hist-text">${esc(h.draft)}</div>` : ""}
+          ${h.extra ? `<div class="btn-row" style="margin-top:6px"><button class="btn ghost" data-openfb="${h.sid}">查看点评</button></div>` : ""}
         </div>`).join("") : `<div class="empty">还没有记录，今天就是第一天。</div>`}
     </div>`;
   $("#backupBtn").addEventListener("click", () =>
     download(JSON.stringify(state, null, 2), `daily-english-backup-${todayKey()}.json`, "application/json"));
+  main.querySelectorAll("[data-openfb]").forEach(b =>
+    b.addEventListener("click", () => {
+      const s = (state.sessions || []).find(x => x.id === Number(b.dataset.openfb));
+      if (s) { extraDone = s; tab = "extra"; render(); }
+    }));
   $("#aiSave").addEventListener("click", () => {
     state.ai = { base: $("#aiBase").value.trim(), model: $("#aiModel").value.trim(), key: $("#aiKey").value.trim() };
     save(); alert("已保存");
