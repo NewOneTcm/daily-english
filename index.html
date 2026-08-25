@@ -216,6 +216,13 @@
   .chart-svg { width: 100%; height: auto; display: block; }
   .legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 8px; flex-wrap: wrap; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  /* 生词库：可点击的原文单词 + 生词面板 */
+  .wv { cursor: pointer; border-bottom: 1px dashed #b9c4bd; padding: 0 1px; }
+  .wv:hover { background: var(--accent-soft); color: var(--accent); }
+  .vocab-panel { margin: 0 0 12px; border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px; background: #f4faf7; }
+  .vocab-word { font-size: 20px; color: var(--accent); }
+  .vocab-sent { font-size: 13px; color: var(--ink-2); font-style: italic; margin: 6px 0 2px; }
 </style>
 </head>
 <body>
@@ -245,7 +252,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -599,6 +606,7 @@ const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
 let tab = "today";
 let review = null; // {queue:[card], idx, showA}
 let extraPick = null; // 自主加练进行中：{skill, idx, startedAt, draft}
+let vocabOpenId = null; // 当前打开的生词面板对应的生词 id
 let extraDone = null; // 刚完成的加练会话，停留在战果登记页
 
 function render() {
@@ -842,11 +850,13 @@ function renderListenArea(area, day, task, extra) {
 function renderReadArea(area, day, lv, task, extra) {
   const target = Math.max(10, Math.round(lv.words / 2));
   area.innerHTML = `
-    <div class="hist-text" style="margin-bottom:12px">${esc(task.passage)}</div>
+    <div class="hist-text" style="margin-bottom:6px">${clickablePassage(task.passage)}</div>
+    <p class="hint" style="margin-bottom:12px">💡 点原文里的生词：加入生词库 → 看语境解释 → 造句练习 → AI 点评</p>
+    <div id="vocabBox">${vocabPanelHTML()}</div>
     <textarea id="draft" placeholder="用英语回应：复述、表态、仿写都可以…">${esc(day.draft || "")}</textarea>
     <div class="wordcount" id="wc"></div>
     <div class="btn-row">
-      <button class="btn primary" id="finishBtn">完成打卡</button>
+      <button class="btn primary" id="finishBtn">完成${extra ? "加练" : "打卡"}</button>
     </div>`;
   const ta = $("#draft");
   const wc = $("#wc");
@@ -856,6 +866,8 @@ function renderReadArea(area, day, lv, task, extra) {
   };
   ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
   upd();
+  bindVocabWords(area, task.passage);
+  bindVocabPanel(area);
   $("#finishBtn").addEventListener("click", () => {
     if (!ta.value.trim() && !confirm(extra ? "还没写回应，结束这次加练？口头复述过了也行。" : "还没写回应，直接打卡？口头复述过了也行。")) return;
     day.draft = ta.value;
@@ -875,6 +887,7 @@ function computeSecs(rec, timerSecs) {
 function finishDaily(day, task, timerSecs) {
   day.secs = computeSecs(day, timerSecs);
   delete day.startedAt;
+  vocabOpenId = null; // 完成打卡，收起生词面板
   day.done = true; day.skill = task.t; day.finishedAt = new Date().toISOString();
   if (countWords(day.draft) >= 5) day.feedback = analyzeWriting(day.draft, state.level);
   save(); render();
@@ -893,6 +906,7 @@ function finishExtra(rec, task, timerSecs) {
   state.sessions.push(s);
   // 刻意练习：加练和打卡一样，写下的内容立刻过一遍本地点评（AI 深度点评在完成页）
   if (countWords(s.draft) >= 5) s.feedback = analyzeWriting(s.draft, state.level);
+  vocabOpenId = null; // 完成加练，收起生词面板
   save();
   extraDone = s; extraPick = null; render();
 }
@@ -901,6 +915,40 @@ function finishExtra(rec, task, timerSecs) {
 function extraTaskFor(skill, idx) {
   const list = TASKS[state.level].filter(t => t.t === skill);
   return list[((idx % list.length) + list.length) % list.length];
+}
+/* 抽卡去重：同一技能下，一轮内不重复；一轮练完自动开新一轮。
+   今天打卡那张卡也不会出现在加练里。 */
+function extraPickIdx(skill) {
+  state.extraSeen = state.extraSeen || {};
+  const key = state.level + ":" + skill;
+  const list = TASKS[state.level].filter(t => t.t === skill);
+  const seen = new Set(state.extraSeen[key] || []);
+  const dt = taskFor(state.level, todayKey(), (getDay(todayKey()) || { swap: 0 }).swap || 0);
+  const dailyIdx = list.indexOf(dt);
+  let avail = list.map((_, i) => i).filter(i => !seen.has(i) && i !== dailyIdx);
+  if (!avail.length) {
+    state.extraSeen[key] = []; // 开启新一轮
+    avail = list.map((_, i) => i).filter(i => i !== dailyIdx);
+    if (!avail.length) avail = list.map((_, i) => i);
+  }
+  const idx = avail[Math.floor(Math.random() * avail.length)];
+  state.extraSeen[key] = (state.extraSeen[key] || []).concat(idx);
+  return idx;
+}
+function extraSwapIdx(pick) {
+  state.extraSeen = state.extraSeen || {};
+  const key = state.level + ":" + pick.skill;
+  const list = TASKS[state.level].filter(t => t.t === pick.skill);
+  if (list.length < 2) return pick.idx; // 只有一张卡，换不了
+  const seen = new Set((state.extraSeen[key] || []).filter(i => i !== pick.idx));
+  let avail = list.map((_, i) => i).filter(i => !seen.has(i) && i !== pick.idx);
+  if (!avail.length) {
+    state.extraSeen[key] = [pick.idx]; // 新一轮，只记住当前这张
+    avail = list.map((_, i) => i).filter(i => i !== pick.idx);
+  }
+  const idx = avail[Math.floor(Math.random() * avail.length)];
+  state.extraSeen[key] = (state.extraSeen[key] || []).concat(idx);
+  return idx;
 }
 function renderExtra(main) {
   if (extraDone) { renderExtraDone(main); return; }
@@ -923,8 +971,7 @@ function renderExtraPick(main) {
     </div>`;
   main.querySelectorAll(".skill-opt").forEach(b =>
     b.addEventListener("click", () => {
-      const list = TASKS[state.level].filter(t => t.t === b.dataset.skill);
-      extraPick = { skill: b.dataset.skill, idx: Math.floor(Math.random() * list.length), startedAt: Date.now(), draft: "" };
+      extraPick = { skill: b.dataset.skill, idx: extraPickIdx(b.dataset.skill), startedAt: Date.now(), draft: "" };
       render();
     }));
 }
@@ -951,7 +998,7 @@ function renderExtraTask(main) {
       <div class="task-meta">${metaText}</div>
       <div style="margin-top:16px" id="doArea"></div>
     </div>`;
-  $("#swapBtn").addEventListener("click", () => { extraPick.idx++; render(); });
+  $("#swapBtn").addEventListener("click", () => { extraPick.idx = extraSwapIdx(extraPick); save(); render(); });
   $("#quitBtn").addEventListener("click", () => {
     if (extraPick.draft && extraPick.draft.trim() && !confirm("这次还没记完，确定放弃？")) return;
     extraPick = null; render();
@@ -1112,6 +1159,170 @@ function renderStats(main) {
     </div>`;
 }
 
+/* ---- 生词库：点击原文生词 → 语境解释 → 造句练习 → AI 点评 → 存学习库 ---- */
+function clickablePassage(text) {
+  let html = "", last = 0;
+  const re = /[A-Za-z]+(?:['’][A-Za-z]+)?/g; // don't 这类带撇号的算一个词
+  let m;
+  while ((m = re.exec(text))) {
+    html += esc(text.slice(last, m.index));
+    html += `<span class="wv">${esc(m[0])}</span>`;
+    last = re.lastIndex;
+  }
+  html += esc(text.slice(last));
+  return html;
+}
+function sentenceOf(passage, word) {
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, "");
+  const parts = passage.match(/[^.!?]+[.!?]+(?:\s+|$)/g) || [passage];
+  const hit = parts.find(s => norm(s).includes(norm(word)));
+  return (hit || passage).trim();
+}
+function addVocab(word, sentence) {
+  const w = word.toLowerCase();
+  let entry = (state.vocab || []).find(v => v.word === w);
+  if (!entry) {
+    state.nextVocabId = state.nextVocabId || (state.vocab.length + 1);
+    entry = { id: state.nextVocabId++, word: w, display: word, sentence, explain: "", example: "", fb: [], saved: false, added: todayKey() };
+    state.vocab.push(entry);
+  } else {
+    entry.sentence = sentence; // 用最新的出处句子
+  }
+  return entry;
+}
+function checkVocabExample(entry) {
+  const norm = s => s.toLowerCase().replace(/[^a-z]/g, "");
+  const tips = [];
+  if (!norm(entry.example).includes(norm(entry.display))) {
+    tips.push({ zh: `造句里得出现「${entry.display}」本身或它的变形（如 widgets / widget's），现在没用到`, en: "", ctx: "" });
+  }
+  entry.fb = tips.concat(analyzeWriting(entry.example, state.level));
+}
+async function aiReviewVocab(entry, btn) {
+  // runAiReview 内部对 day.feedback 重新赋值，用代理对象接住再回写
+  const proxy = { draft: entry.example, feedback: entry.fb || [] };
+  await runAiReview(proxy, btn);
+  if (proxy.feedback !== (entry.fb || [])) entry.fb = proxy.feedback;
+}
+async function runAiVocabExplain(entry, btn) {
+  const ai = state.ai || {};
+  if (!ai.base || !ai.model || (!ai.key && !/^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base))) {
+    alert("先在「记录」页配置 AI 接口：地址和模型必填，本机地址可不填 Key");
+    return;
+  }
+  const localBase = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base);
+  if (location.protocol === "file:" && localBase) {
+    alert("AI 功能需要在本机中转地址下使用：请打开 http://127.0.0.1:8787/ （开机自启的入口就是它）");
+    return;
+  }
+  btn.disabled = true; btn.textContent = "解释中…";
+  try {
+    const headers = { "Content-Type": "application/json" };
+    if (ai.key) headers["Authorization"] = "Bearer " + ai.key;
+    const resp = await fetch(ai.base.replace(/\/+$/, "") + "/chat/completions", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: ai.model,
+        messages: [
+          { role: "system", content: "你是英语词汇老师。用户给你一个英文单词和它的出处句子。严格输出两行：第一行：词性 + 结合句中语境的中文释义；第二行：一个用这个单词的新例句（难度与用户水平 " + state.level + " 相当）。不要输出任何其他内容。" },
+          { role: "user", content: "单词：" + entry.display + "\n出处句子：" + entry.sentence },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error("HTTP " + resp.status + " " + (await resp.text()).slice(0, 120));
+    const data = await resp.json();
+    const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+    if (!text.trim()) throw new Error("AI 返回了空内容");
+    entry.explain = text.trim();
+    save(); render();
+  } catch (e) {
+    const isHttpError = /^HTTP \d/.test(e.message);
+    const hint = isHttpError
+      ? "接口已连通，以上是模型返回的错误，按其提示调整配置即可。"
+      : localBase
+      ? "本机中转（127.0.0.1:8787）没响应，可到项目目录运行 python proxy.py 手动拉起。"
+      : "网络不通、地址写错或跨域被拦截。";
+    alert("AI 解释失败：" + e.message + "\n\n" + hint);
+    btn.disabled = false; btn.textContent = "AI 解释（结合原句）";
+  }
+}
+function vocabToCard(entry) {
+  const firstLine = (entry.explain || "").split("\n")[0].slice(0, 60);
+  const en = entry.example ? `${entry.display}: ${entry.example}` : entry.display;
+  const zh = `「${entry.display}」${firstLine ? "：" + firstLine : ""}，看释义回忆你的造句`;
+  addCard(en, zh, `原句：${entry.sentence}`, "vocab");
+  entry.saved = true;
+}
+function vocabPanelHTML() {
+  const entry = (state.vocab || []).find(v => v.id === vocabOpenId);
+  if (!entry) return "";
+  return `
+    <div class="vocab-panel">
+      <div class="row" style="justify-content:space-between">
+        <b class="vocab-word">${esc(entry.display)}</b>
+        <button class="btn ghost" id="vcClose" title="收起">×</button>
+      </div>
+      <div class="vocab-sent">原句：${esc(entry.sentence)}</div>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn" id="vcAiExplain">AI 解释（结合原句）</button>
+      </div>
+      <textarea id="vcZh" style="margin-top:10px;min-height:60px" placeholder="释义：点「AI 解释」自动填，也可以自己写一条">${esc(entry.explain)}</textarea>
+      <textarea id="vcExample" style="margin-top:10px;min-height:70px" placeholder="用「${esc(entry.display)}」造一句你自己的话，别抄原句…">${esc(entry.example)}</textarea>
+      <div class="btn-row">
+        <button class="btn" id="vcCheck">检查造句</button>
+        <button class="btn" id="vcAiFb">AI 点评造句</button>
+        <button class="btn primary" id="vcSave" ${entry.saved ? "disabled" : ""}>${entry.saved ? "已存入学习库 ✓" : "存入学习库"}</button>
+      </div>
+      ${(entry.fb && entry.fb.length) ? `
+      <ul class="tips" style="margin-top:10px">
+        ${entry.fb.map(t => `
+          <li>
+            <div class="tip-zh">${t.praise ? "🌟 " : ""}${esc(t.zh)}</div>
+            ${t.en ? `<div class="tip-en">→ ${esc(t.en)}</div>` : ""}
+            ${t.ctx ? `<div class="tip-ctx">${esc(t.ctx)}</div>` : ""}
+          </li>`).join("")}
+      </ul>` : ""}
+      <p class="hint" style="margin-top:8px">存入学习库后进入复习队列，可随表达库一起导出 SuperMemo。</p>
+    </div>`;
+}
+function bindVocabWords(area, passage) {
+  area.querySelectorAll(".wv").forEach(sp =>
+    sp.addEventListener("click", () => {
+      const entry = addVocab(sp.textContent, sentenceOf(passage, sp.textContent));
+      vocabOpenId = entry.id;
+      save(); render();
+    }));
+}
+function bindVocabPanel(area) {
+  const entry = (state.vocab || []).find(v => v.id === vocabOpenId);
+  if (!entry) return;
+  const close = $("#vcClose", area);
+  if (close) close.addEventListener("click", () => { vocabOpenId = null; save(); render(); });
+  const zh = $("#vcZh", area);
+  if (zh) zh.addEventListener("input", () => { entry.explain = zh.value; save(); });
+  const ex = $("#vcExample", area);
+  if (ex) ex.addEventListener("input", () => { entry.example = ex.value; save(); });
+  const ai = $("#vcAiExplain", area);
+  if (ai) ai.addEventListener("click", () => runAiVocabExplain(entry, ai));
+  const ck = $("#vcCheck", area);
+  if (ck) ck.addEventListener("click", () => {
+    if (!entry.example.trim()) { alert("先造一句，再检查"); return; }
+    checkVocabExample(entry); save(); render();
+  });
+  const af = $("#vcAiFb", area);
+  if (af) af.addEventListener("click", () => {
+    if (!entry.example.trim()) { alert("先造一句，再点评"); return; }
+    aiReviewVocab(entry, af);
+  });
+  const sv = $("#vcSave", area);
+  if (sv) sv.addEventListener("click", () => {
+    if (entry.saved) return;
+    vocabToCard(entry);
+    save(); render();
+  });
+}
+
 /* ---- 快速存表达 ---- */
 function quickAddForm() {
   return `
@@ -1215,6 +1426,20 @@ function renderCards(main) {
       ${quickAddForm()}
     </div>
     <div class="card">
+      <div class="section-title">生词库（${(state.vocab || []).length}）</div>
+      <p class="hint">阅读时点原文里的单词进库，结合原句解释、造句练习后再存进学习库。</p>
+      ${(state.vocab || []).length ? `<ul class="list" style="margin-top:8px">
+        ${[...state.vocab].reverse().map(v => `
+          <li>
+            <span class="tag-fb" style="background:#e8f0fb;color:#4a7fa5">生词</span>
+            <span class="en">${esc(v.display)}</span>
+            <span class="zh">${esc((v.explain || "").split("\n")[0].slice(0, 40))}${v.example ? " · 已造句" : " · 未造句"}</span>
+            ${v.saved ? `<span class="due" style="color:var(--accent)">已入库 ✓</span>` : `<button class="btn ghost" data-vsave="${v.id}" title="存入学习库">存</button>`}
+            <button class="btn ghost danger" data-vdel="${v.id}" title="删除">×</button>
+          </li>`).join("")}
+      </ul>` : `<div class="empty" style="padding:16px 10px">还什么都没有。阅读时点击原文里的生词，就会出现在这里。</div>`}
+    </div>
+    <div class="card">
       <div class="row" style="justify-content:space-between;margin-bottom:6px">
         <div class="section-title" style="margin:0">全部表达（${state.cards.length}）</div>
         <div class="row">
@@ -1224,7 +1449,7 @@ function renderCards(main) {
       ${sorted.length ? `<ul class="list">
         ${sorted.map(c => `
           <li>
-            ${c.type === "fb" ? `<span class="tag-fb">反馈</span>` : ""}
+            ${c.type === "fb" ? `<span class="tag-fb">反馈</span>` : c.type === "vocab" ? `<span class="tag-fb" style="background:#e8f0fb;color:#4a7fa5">生词</span>` : ""}
             <span class="en">${esc(c.en)}</span>
             <span class="zh">${esc(c.zh)}</span>
             <span class="due ${c.due <= t ? "today" : ""}">${c.due <= t ? "待复习" : c.due + " 见"}</span>
@@ -1234,6 +1459,17 @@ function renderCards(main) {
     </div>`;
   bindQuickAdd(main);
   $("#exportSm").addEventListener("click", exportSuperMemo);
+  main.querySelectorAll("[data-vsave]").forEach(b =>
+    b.addEventListener("click", () => {
+      const v = (state.vocab || []).find(x => x.id === Number(b.dataset.vsave));
+      if (v) { vocabToCard(v); save(); render(); }
+    }));
+  main.querySelectorAll("[data-vdel]").forEach(b =>
+    b.addEventListener("click", () => {
+      if (!confirm("删掉这个生词？")) return;
+      state.vocab = state.vocab.filter(x => x.id !== Number(b.dataset.vdel));
+      save(); render();
+    }));
   main.querySelectorAll("[data-del]").forEach(b =>
     b.addEventListener("click", () => {
       if (!confirm("删掉这条表达？")) return;
