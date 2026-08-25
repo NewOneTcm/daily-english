@@ -528,7 +528,8 @@ async function runAiReview(day, btn) {
 
 function feedbackSection(day) {
   const tips = day.feedback || [];
-  if (!tips.length) return "";
+  // 有反馈，或写过东西（哪怕本地点评没吐出条目，也允许直接上 AI 点评）
+  if (!tips.length && !(day.draft && countWords(day.draft) > 0)) return "";
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -890,6 +891,8 @@ function finishExtra(rec, task, timerSecs) {
     finishedAt: new Date().toISOString(),
   };
   state.sessions.push(s);
+  // 刻意练习：加练和打卡一样，写下的内容立刻过一遍本地点评（AI 深度点评在完成页）
+  if (countWords(s.draft) >= 5) s.feedback = analyzeWriting(s.draft, state.level);
   save();
   extraDone = s; extraPick = null; render();
 }
@@ -967,6 +970,7 @@ function renderExtraDone(main) {
       <h2>加练完成 · ${SKILL_BADGE[s.skill] || s.skill}</h2>
       <p>用时 ${fmtMins(s.secs)} · 已计入「统计」</p>
     </div>
+    ${feedbackSection(s)}
     <div class="card">
       <div class="section-title">这次学到了什么？</div>
       <p class="hint">新学的单词 / 短语 / 句子分别记个数，点几下就行。</p>
@@ -987,6 +991,7 @@ function renderExtraDone(main) {
     </div>`;
   bindLearnReport(main, s);
   bindQuickAdd(main);
+  bindFeedback(main, s);
   $("#againBtn").addEventListener("click", () => { extraDone = null; extraPick = null; render(); });
   $("#backToday").addEventListener("click", () => { extraDone = null; extraPick = null; tab = "today"; render(); });
 }
