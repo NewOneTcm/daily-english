@@ -78,6 +78,7 @@
 
 - **本地点评**（离线，零配置）：15+ 条中国学习者高频错误规则（三单、不可数名词、although/but 混用、because/so 混用等）+ 长度、重复用词、长句、连接词、大小写检查
 - **AI 深度点评**（可选）：「记录」页配置接口地址 + 模型 + API Key，支持任何 OpenAI 格式接口；配置后先点「测试连接」确认通畅
+- **反馈一键入库**：打卡或加练的反馈区有「全部存到表达库」按钮，把本轮所有反馈一次性收进表达库（逐条「存为复习点」也保留）
   - **Kimi Code 会员**：接口地址填 `http://127.0.0.1:8787/v1`，模型 `k3-256k`（按会员档位，也可 `kimi-for-coding`），Key 用会员 Key。会员端点 `api.kimi.com/coding` 不允许浏览器跨域直连，所以走本机中转 `proxy.py`（开机自启；页面也从这个中转地址打开，天然同源）
   - Kimi：`https://api.moonshot.cn/v1`，模型如 `kimi-k2-0905-preview`
   - DeepSeek：`https://api.deepseek.com/v1`，模型 `deepseek-chat`
