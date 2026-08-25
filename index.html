@@ -1287,14 +1287,6 @@ function addVocab(word, sentence) {
   }
   return entry;
 }
-function checkVocabExample(entry) {
-  const norm = s => s.toLowerCase().replace(/[^a-z]/g, "");
-  const tips = [];
-  if (!norm(entry.example).includes(norm(entry.display))) {
-    tips.push({ zh: `造句里得出现「${entry.display}」本身或它的变形（如 widgets / widget's），现在没用到`, en: "", ctx: "" });
-  }
-  entry.fb = tips.concat(analyzeWriting(entry.example, state.level));
-}
 async function aiReviewVocab(entry, btn) {
   // runAiReview 内部对 day.feedback 重新赋值，用代理对象接住再回写
   const proxy = { draft: entry.example, feedback: entry.fb || [] };
@@ -1364,10 +1356,10 @@ function vocabEntryHTML(v) {
       <textarea data-vzh="${v.id}" style="margin-top:10px;min-height:56px" placeholder="释义：点「AI 解释」自动填，也可以自己写一条">${esc(v.explain)}</textarea>
       <textarea data-vex="${v.id}" style="margin-top:10px;min-height:70px" placeholder="用「${esc(v.display)}」造一句你自己的话，别抄原句…">${esc(v.example)}</textarea>
       <div class="btn-row">
-        <button class="btn" data-vcheck="${v.id}">检查造句</button>
         <button class="btn" data-vaifb="${v.id}">AI 点评造句</button>
         <button class="btn primary" data-vsave="${v.id}" ${v.saved ? "disabled" : ""}>${v.saved ? "已存学习库 ✓" : "生词存入学习库"}</button>
       </div>
+      <p class="hint" style="margin-top:6px">多次点评会累积保留（新点评追加在下方），有价值的逐条「存到学习库」。</p>
       ${(v.fb && v.fb.length) ? `
       <ul class="tips" style="margin-top:10px">
         ${v.fb.map((t, i) => `
@@ -1395,11 +1387,6 @@ function bindVocabEntry(main, v) {
   if (zh) zh.addEventListener("input", () => { v.explain = zh.value; save(); });
   const ex = q(`[data-vex="${v.id}"]`);
   if (ex) ex.addEventListener("input", () => { v.example = ex.value; save(); });
-  const ck = q(`[data-vcheck="${v.id}"]`);
-  if (ck) ck.addEventListener("click", () => {
-    if (!v.example.trim()) { alert("先造一句，再检查"); return; }
-    checkVocabExample(v); save(); render();
-  });
   const af = q(`[data-vaifb="${v.id}"]`);
   if (af) af.addEventListener("click", () => {
     if (!v.example.trim()) { alert("先造一句，再点评"); return; }
