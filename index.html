@@ -243,11 +243,28 @@
     pointer-events: none;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 雅思式阅读题 */
+  .q-block { margin: 4px 0 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .q-score { font-size: 13px; font-weight: 600; color: var(--accent); }
+  .q-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; background: #fbfcfb; }
+  .q-title { font-size: 14px; font-weight: 600; }
+  .q-opts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .q-opt { padding: 6px 14px; font-size: 13px; }
+  .q-opt.picked { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .q-sa { width: 100%; min-height: 60px; margin-top: 10px; }
+  .q-reveal { margin-top: 8px; }
+  .q-ref { margin-top: 8px; font-size: 13px; color: var(--accent); background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; }
+  .q-result { margin-top: 8px; font-size: 13px; }
+  .q-correct { color: var(--accent); font-weight: 600; }
+  .q-wrong { color: var(--red); font-weight: 600; }
+  .q-why { display: block; color: var(--ink-2); margin-top: 2px; }
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 
+<script src="b2-reading.js"></script>
 <script>
 "use strict";
 
@@ -504,6 +521,10 @@ const TASKS = {
       passage: "Every app wants to remove friction, to make spending effortless. But friction is often the only thing standing between you and a bad decision. A two-second delay before a purchase, a password before a confession — these small walls are not bugs. They are the last honest parts of the design." },
   ],
 };
+// 合并外部题库（b2-reading.js），扩充 B2 阅读卡池
+if (window.B2_READING && window.B2_READING.length) {
+  TASKS.B2 = TASKS.B2.concat(window.B2_READING);
+}
 
 /* ============ 工具 ============ */
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -970,12 +991,99 @@ function renderListenArea(area, day, task, extra) {
   });
 }
 
+/* ---- 雅思式阅读题：短文 + 判断题/单选/简答 ---- */
+const TF_LABEL = { T: "True", F: "False", NG: "Not Given" };
+function readScore(task, day) {
+  const qs = task.qs || [];
+  let right = 0, total = 0;
+  qs.forEach((q, i) => {
+    if (q.type === "sa") return; // 简答不计分
+    total++;
+    const ans = (day.qans || {})[i];
+    if (ans !== undefined && ans === q.a) right++;
+  });
+  return { right, total };
+}
+function qResultHTML(q, i, day) {
+  const ans = (day.qans || {})[i];
+  if (ans === undefined || q.type === "sa") return "";
+  const ok = ans === q.a;
+  const correct = q.type === "mc" ? q.opts[q.a] : TF_LABEL[q.a];
+  return (ok
+    ? `<span class="q-correct">✓ 正确</span>`
+    : `<span class="q-wrong">✗ 正确答案：${esc(correct)}</span>`) + (q.why ? `<span class="q-why">${esc(q.why)}</span>` : "");
+}
+function readQuestionsHTML(task, day) {
+  const qs = task.qs || [];
+  if (!qs.length) return "";
+  const s = readScore(task, day);
+  const ans = day.qans || {}, rev = day.qrev || {};
+  return `
+    <div class="q-block">
+      <div class="row" style="justify-content:space-between">
+        <span class="section-title" style="margin:0">阅读题</span>
+        <span class="q-score" id="qScore">答对 ${s.right} / ${s.total}</span>
+      </div>
+      ${qs.map((q, i) => `
+        <div class="q-item" data-q="${i}">
+          <div class="q-title">${i + 1}. ${esc(q.q)}</div>
+          ${q.type === "tf" ? `<div class="q-opts">${Object.keys(TF_LABEL).map(v => `<button class="btn q-opt${ans[i] === v ? " picked" : ""}" data-qidx="${i}" data-qval="${v}">${TF_LABEL[v]}</button>`).join("")}</div>` : ""}
+          ${q.type === "mc" ? `<div class="q-opts">${q.opts.map((o, k) => `<button class="btn q-opt${ans[i] === k ? " picked" : ""}" data-qidx="${i}" data-qval="${k}">${esc(o)}</button>`).join("")}</div>` : ""}
+          ${q.type === "sa" ? `
+            <textarea class="q-sa" data-qsa="${i}" placeholder="用英文简短回答…">${esc(ans[i] || "")}</textarea>
+            ${rev[i] ? `<div class="q-ref"><b>参考：</b>${esc(q.a)}${q.why ? `<div class="q-why">${esc(q.why)}</div>` : ""}</div>` : `<button class="btn ghost q-reveal" data-qidx="${i}">查看参考答案</button>`}` : ""}
+          <div class="q-result">${qResultHTML(q, i, day)}</div>
+        </div>`).join("")}
+    </div>`;
+}
+function bindReadQuestions(root, task, day) {
+  const qs = task.qs || [];
+  if (!qs.length) return;
+  day.qans = day.qans || {};
+  day.qrev = day.qrev || {};
+  const updateScore = () => {
+    const s = readScore(task, day);
+    const el = root.querySelector("#qScore");
+    if (el) el.textContent = `答对 ${s.right} / ${s.total}`;
+  };
+  root.querySelectorAll(".q-opt").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.dataset.qidx);
+      const q = qs[i];
+      const val = q.type === "mc" ? Number(btn.dataset.qval) : btn.dataset.qval;
+      day.qans[i] = val;
+      save();
+      const item = root.querySelector(`[data-q="${i}"]`);
+      item.querySelectorAll(".q-opt").forEach(b => b.classList.remove("picked"));
+      btn.classList.add("picked");
+      item.querySelector(".q-result").innerHTML = qResultHTML(q, i, day);
+      updateScore();
+    });
+  });
+  root.querySelectorAll(".q-sa").forEach(ta => {
+    const i = Number(ta.dataset.qsa);
+    ta.addEventListener("input", () => { day.qans[i] = ta.value; save(); });
+  });
+  root.querySelectorAll(".q-reveal").forEach(b => {
+    const i = Number(b.dataset.qidx);
+    const q = qs[i];
+    b.addEventListener("click", () => {
+      day.qrev[i] = true; save();
+      const ref = document.createElement("div");
+      ref.className = "q-ref";
+      ref.innerHTML = `<b>参考：</b>${esc(q.a)}${q.why ? `<div class="q-why">${esc(q.why)}</div>` : ""}`;
+      b.replaceWith(ref);
+    });
+  });
+}
+
 function renderReadArea(area, day, lv, task, extra) {
   const target = Math.max(10, Math.round(lv.words / 2));
   area.innerHTML = `
     <div class="hist-text" id="passageBox" style="margin-bottom:6px">${esc(task.passage)}</div>
     <p class="hint" style="margin-bottom:12px">💡 划选原文里的单词或短语：弹出解释，一键加入生词库（自动带上原句）</p>
-    <textarea id="draft" placeholder="用英语回应：复述、表态、仿写都可以…">${esc(day.draft || "")}</textarea>
+    ${readQuestionsHTML(task, day)}
+    <textarea id="draft" placeholder="用 1-2 句英文总结这段话，或写下你的看法…">${esc(day.draft || "")}</textarea>
     <div class="wordcount" id="wc"></div>
     <div class="btn-row">
       <button class="btn primary" id="finishBtn">完成${extra ? "加练" : "打卡"}</button>
@@ -984,13 +1092,14 @@ function renderReadArea(area, day, lv, task, extra) {
   const wc = $("#wc");
   const upd = () => {
     const n = countWords(ta.value);
-    wc.innerHTML = `回应 <b>${n}</b> / ${target} 词` + (n >= target ? " · 够了，打卡吧" : "");
+    wc.innerHTML = `总结 <b>${n}</b> 词` + (n >= target ? " · 够了" : "");
   };
   ta.addEventListener("input", () => { day.draft = ta.value; save(); upd(); });
   upd();
   bindPassageSelect($("#passageBox", area), task.passage);
+  bindReadQuestions(area, task, day);
   $("#finishBtn").addEventListener("click", () => {
-    if (!ta.value.trim() && !confirm(extra ? "还没写回应，结束这次加练？口头复述过了也行。" : "还没写回应，直接打卡？口头复述过了也行。")) return;
+    if (!ta.value.trim() && !confirm(extra ? "还没写总结，结束这次加练？读完、答过题也算。" : "还没写总结，直接打卡？读完、答过题也算。")) return;
     day.draft = ta.value;
     if (extra) { finishExtra(day, task, 0); return; }
     finishDaily(day, task, 0);
