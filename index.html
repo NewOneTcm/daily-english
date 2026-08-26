@@ -641,7 +641,7 @@ async function runAiReview(day, btn) {
   }
   const localBase = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base);
   if (location.protocol === "file:" && localBase) {
-    alert("AI 点评需要在本机中转地址下使用：请打开 http://127.0.0.1:8787/ （开机自启的入口就是它）");
+    alert("AI 点评需要在本机中转地址下使用：请先运行 proxy.py 或 open.bat 启动本机中转，再打开 http://127.0.0.1:8787/");
     return;
   }
   btn.disabled = true; btn.textContent = "点评中…";
@@ -655,7 +655,7 @@ async function runAiReview(day, btn) {
     const hint = isHttpError
       ? "接口已连通，以上是模型返回的错误，按其提示调整配置即可。"
       : localBase
-      ? "本机中转（127.0.0.1:8787）没响应。它已设置开机自启；如果刚开机稍等几秒刷新重试，仍不行就到项目目录运行 python proxy.py 手动拉起。"
+      ? "本机中转（127.0.0.1:8787）没响应。如果刚启动稍等几秒刷新重试，仍不行就到项目目录运行 python proxy.py 手动拉起。"
       : "网络不通、地址写错或跨域被拦截。";
     alert("AI 点评失败：" + e.message + "\n\n" + hint);
     btn.disabled = false; btn.textContent = "AI 深度点评";
@@ -1541,7 +1541,7 @@ async function runAiVocabExplain(entry, btn) {
   }
   const localBase = /^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base);
   if (location.protocol === "file:" && localBase) {
-    alert("AI 功能需要在本机中转地址下使用：请打开 http://127.0.0.1:8787/ （开机自启的入口就是它）");
+    alert("AI 功能需要在本机中转地址下使用：请先运行 proxy.py 或 open.bat 启动本机中转，再打开 http://127.0.0.1:8787/");
     return;
   }
   btn.disabled = true; btn.textContent = "解释中…";
