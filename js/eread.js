@@ -37,7 +37,7 @@ function renderERead(main) {
       <div class="row" style="justify-content:space-between">
         <div style="font-size:13px;color:var(--ink-2)">${esc(item.added || "")} · ${countWords(item.text)} 词</div>
         <div class="row" style="gap:6px">
-          <button class="btn ghost" data-ai>AI 提取生词词组</button>
+          ${open ? `<button class="btn ghost" data-ai>AI 提取生词词组</button>` : ""}
           <button class="btn ghost" data-toggle>${open ? "收起 ▴" : "展开 ▾"}</button>
           <button class="btn ghost danger" data-del>删除</button>
         </div>
@@ -51,7 +51,8 @@ function renderERead(main) {
       if (ereadOpen === item.id) ereadOpen = null;
       save(); render();
     });
-    card.querySelector("[data-ai]").addEventListener("click", e => runAiExtract(item.id, e.target));
+    const aiBtn = card.querySelector("[data-ai]");
+    if (aiBtn) aiBtn.addEventListener("click", e => runAiExtract(item.id, e.target));
     list.appendChild(card);
     if (open) paintReadView(card.querySelector(".rt-body"), item);
     paintEreadTips(card.querySelector(".rt-body"), item); // 提取结果跟随文章一起折叠
@@ -118,11 +119,12 @@ function paintEreadTips(box, item) {
 async function runAiExtract(textId, btn) {
   const item = (state.readTexts || []).find(x => x.id === textId);
   if (!item) return;
+  if (item.tips && item.tips.length && !confirm("这篇已经提取过了，确定要再次提取吗？（会再调用一次 AI 接口，结果会覆盖旧的）")) return;
   btn.disabled = true; btn.textContent = "提取中…";
   try {
     const content = await aiChat([
-      { role: "system", content: "你是英语老师。从用户给的英文文本中挑选 5-10 个最值得学习的生词或词组，每条一行，格式严格为：英文 || 中文释义 || 包含它的原句片段。不要输出其他内容。" },
-      { role: "user", content: item.text.slice(0, 4000) },
+      { role: "system", content: "你是英语老师。从用户给的英文文本中挑选 5-10 个最值得学习的生词或词组，优先挑选略高于用户当前水平、对ta有提升价值的，而不是人人都认识的简单词。每条一行，格式严格为：英文 || 中文释义 || 包含它的原句片段。不要输出其他内容。" },
+      { role: "user", content: "用户当前英语级别：" + (LEVELS[state.level] ? LEVELS[state.level].label : state.level) + "\n\n文本：\n" + item.text.slice(0, 4000) },
     ]);
     const tips = content.split(/\n+/).map(l => l.replace(/^[-*\d.\s、]+/, "")).filter(l => l.includes("||"))
       .map(l => { const p = l.split("||").map(s => s.trim()); return { en: p[0] || "", zh: p[1] || "", ctx: (p[2] || "").slice(0, 140) }; });
