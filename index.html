@@ -308,6 +308,7 @@
 <div class="wrap" id="app"></div>
 
 <script src="b2-reading.js"></script>
+<script src="js/tips-saver.js"></script>
 <script src="js/journal.js"></script>
 <script src="js/eread.js"></script>
 <script src="js/vocab.js"></script>
@@ -716,44 +717,21 @@ function feedbackSection(day) {
   const tips = day.feedback || [];
   // 有反馈，或写过东西（哪怕本地点评没吐出条目，也允许直接上 AI 点评）
   if (!tips.length && !(day.draft && countWords(day.draft) > 0)) return "";
-  const pending = tips.filter(t => t.en && !t.saved).length;
   return `
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <div class="section-title" style="margin:0">本次反馈</div>
         <div class="row">
-          ${pending ? `<button class="btn primary" id="saveAllFb">全部存到表达库（${pending}）</button>` : ""}
           <button class="btn ghost" id="aiBtn">AI 深度点评</button>
         </div>
       </div>
       <p class="hint" style="margin-top:2px">有价值的反馈存成复习点，明天起进入复习队列（也可随表达库一起导给 SuperMemo）。</p>
-      <ul class="tips">
-        ${tips.map((t, i) => `
-          <li>
-            <div class="tip-zh">${t.praise ? "🌟 " : ""}${esc(t.zh)}</div>
-            ${t.en ? `<div class="tip-en">→ ${esc(t.en)}</div>` : ""}
-            ${t.ctx ? `<div class="tip-ctx">${esc(t.ctx)}</div>` : ""}
-            ${t.en && !t.saved ? `<button class="btn" data-tipidx="${i}">存为复习点</button>` : ""}
-            ${t.saved ? `<span class="saved-mark">已存 ✓</span>` : ""}
-          </li>`).join("")}
-      </ul>
+      <div id="fbSaver"></div>
     </div>`;
 }
 function bindFeedback(root, day) {
-  root.querySelectorAll("[data-tipidx]").forEach(b =>
-    b.addEventListener("click", () => {
-      const t = day.feedback[Number(b.dataset.tipidx)];
-      addCard(t.en, t.zh, t.ctx, "fb");
-      t.saved = true; save(); render();
-    }));
-  const saveAll = $("#saveAllFb", root);
-  if (saveAll) saveAll.addEventListener("click", () => {
-    let n = 0;
-    (day.feedback || []).forEach(t => {
-      if (t.en && !t.saved) { addCard(t.en, t.zh, t.ctx, "fb"); t.saved = true; n++; }
-    });
-    save(); render();
-    if (n) toast(`已存 ${n} 条到表达库 ✓`);
+  renderTipsSaver($("#fbSaver", root), day.feedback || [], {
+    type: "fb", itemLabel: "存为复习点", saveAllLabel: "全部存到表达库",
   });
   const aiBtn = $("#aiBtn", root);
   if (aiBtn) aiBtn.addEventListener("click", () => runAiReview(day, aiBtn));

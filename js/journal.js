@@ -95,45 +95,9 @@ function renderJournal(main) {
   updWc();
 
   // 点评结果持久化：存到 state.journalTips[日期]，切走再回来不丢
-  const markJ = (b, text) => {
-    const m = document.createElement("span");
-    m.className = "saved-mark";
-    m.textContent = text;
-    b.replaceWith(m);
-  };
   function paintJournalTips() {
-    const box = $("#jTips");
-    if (!journalTips.length) return;
-    box.innerHTML = `
-      <div class="btn-row" style="margin-top:10px"><button class="btn primary" id="jSaveAll">一键全部存入表达库</button></div>
-      <ul class="tips">${journalTips.map((t, i) => `
-        <li>
-          <div class="tip-zh">${esc(t.zh)}</div>
-          <div class="tip-en">→ ${esc(t.en)}</div>
-          ${cardExists(t.en)
-            ? `<span class="saved-mark">已存在</span>`
-            : `<button class="btn primary" data-jtip="${i}">存入表达库</button>`}
-        </li>`).join("")}</ul>`;
-    box.querySelectorAll("[data-jtip]").forEach(b =>
-      b.addEventListener("click", () => {
-        const t = journalTips[Number(b.dataset.jtip)];
-        if (cardExists(t.en)) { markJ(b, "已存在"); return; }
-        addCard(t.en, t.zh, "日记 " + journalSel, "fb");
-        save();
-        markJ(b, "已存 ✓");
-      }));
-    $("#jSaveAll").addEventListener("click", () => {
-      let added = 0, dup = 0;
-      journalTips.forEach(t => {
-        if (cardExists(t.en)) dup++;
-        else { addCard(t.en, t.zh, "日记 " + journalSel, "fb"); added++; }
-      });
-      save();
-      box.querySelectorAll("[data-jtip]").forEach(b => markJ(b, "已存 ✓"));
-      toast("存入 " + added + " 条" + (dup ? "，" + dup + " 条已存在跳过" : ""));
-      const d = document.createElement("span");
-      d.className = "saved-mark"; d.textContent = "已全部存入 ✓";
-      $("#jSaveAll").replaceWith(d);
+    renderTipsSaver($("#jTips"), journalTips, {
+      type: "fb", ctxFallback: "日记 " + journalSel, itemLabel: "存入表达库",
     });
   }
   $("#jCheck").addEventListener("click", async () => {
@@ -143,7 +107,7 @@ function renderJournal(main) {
     btn.disabled = true; btn.textContent = "点评中…";
     try {
       const content = await aiChat([
-        { role: "system", content: "你是英语写作教练。用户每天用英语写日记。给出 2-4 条最关键的反馈（语法、用词、地道度），每条一行，格式严格为：中文问题简述 || 正确或更地道的英文表达。不要输出任何其他内容。" },
+        { role: "system", content: "你是英语写作教练。用户每天用英语写日记。给出 2-4 条最关键的反馈（语法、单词用法、单词拼写、地道度），每条一行，格式严格为：中文问题简述 || 原写法||正确或更地道的英文表达。不要输出任何其他内容。" },
         { role: "user", content: "用户级别：" + state.level + "\n\n日记内容：\n" + ta.value.slice(0, 3000) },
       ]);
       journalTips = content.split(/\n+/).map(l => l.replace(/^[-*\d.\s、]+/, "")).filter(l => l.includes("||"))

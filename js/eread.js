@@ -69,51 +69,12 @@ function paintReadView(box, item) {
 function paintEreadTips(box, item) {
   const tips = item.tips; // 存在文本上，切走再回来不丢
   if (!tips || !tips.length) return;
-  const div = document.createElement("div");
-  div.innerHTML = `
-    <div class="row" style="justify-content:space-between;margin-top:14px">
-      <div class="section-title" style="margin:0">AI 提取的学习点</div>
-      <button class="btn primary" data-saveall>一键全部存入表达库</button>
-    </div>
-    <ul class="tips">
-      ${tips.map((t, i) => `
-        <li>
-          <div class="tip-zh">${esc(t.en)} <span style="color:var(--ink-2);font-weight:400">— ${esc(t.zh)}</span></div>
-          ${t.ctx ? `<div class="tip-en">${esc(t.ctx)}</div>` : ""}
-          ${cardExists(t.en)
-            ? `<span class="saved-mark">已存在</span>`
-            : `<button class="btn primary" data-rt="${i}">存入表达库</button>`}
-        </li>`).join("")}
-    </ul>`;
-  box.appendChild(div);
-  const markSaved = (b, text) => {
-    const m = document.createElement("span");
-    m.className = "saved-mark";
-    m.textContent = text;
-    b.replaceWith(m);
-  };
-  div.querySelectorAll("[data-rt]").forEach(b =>
-    b.addEventListener("click", () => {
-      const t = tips[Number(b.dataset.rt)];
-      if (cardExists(t.en)) { markSaved(b, "已存在"); return; }
-      addCard(t.en, t.zh, t.ctx, "expr");
-      save();
-      markSaved(b, "已存 ✓");
-    }));
-  div.querySelector("[data-saveall]").addEventListener("click", e => {
-    let added = 0, dup = 0;
-    tips.forEach(t => {
-      if (cardExists(t.en)) dup++;
-      else { addCard(t.en, t.zh, t.ctx, "expr"); added++; }
-    });
-    save();
-    div.querySelectorAll("[data-rt]").forEach(b => markSaved(b, "已存 ✓"));
-    toast("存入 " + added + " 条" + (dup ? "，" + dup + " 条已存在跳过" : ""));
-    const done = document.createElement("span");
-    done.className = "saved-mark";
-    done.textContent = "已全部存入 ✓";
-    e.target.replaceWith(done);
-  });
+  const head = document.createElement("div");
+  head.innerHTML = '<div class="section-title" style="margin-top:14px">AI 提取的学习点</div>';
+  box.appendChild(head);
+  const holder = document.createElement("div");
+  box.appendChild(holder);
+  renderTipsSaver(holder, tips, { type: "expr", itemLabel: "存入表达库", wordFirst: true });
 }
 
 async function runAiExtract(textId, btn) {

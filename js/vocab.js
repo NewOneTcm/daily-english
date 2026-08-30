@@ -89,7 +89,6 @@ function renderVocab(main) {
 }
 function vocabEntryHTML(v) {
   const isPhrase = /\s/.test(v.display.trim());
-  const pendingTips = (v.fb || []).filter(t => t.en && !t.saved).length;
   return `
     <div class="card vocab-entry">
       <div class="row" style="justify-content:space-between">
@@ -114,21 +113,7 @@ function vocabEntryHTML(v) {
       <div class="btn-row">
         <button class="btn" data-vaifb="${v.id}">AI 点评造句</button>
       </div>
-      ${(v.fb && v.fb.length) ? `
-      <div class="row" style="justify-content:space-between;margin-top:10px">
-        <span class="hint" style="margin:0">多次点评累积保留，逐条或一键存学习库。</span>
-        ${pendingTips ? `<button class="btn" data-vtipall="${v.id}">点评全部存到学习库（${pendingTips}）</button>` : ""}
-      </div>
-      <ul class="tips" style="margin-top:8px">
-        ${v.fb.map((t, i) => `
-          <li>
-            <div class="tip-zh">${t.praise ? "🌟 " : ""}${esc(t.zh)}</div>
-            ${t.en ? `<div class="tip-en">→ ${esc(t.en)}</div>` : ""}
-            ${t.ctx ? `<div class="tip-ctx">${esc(t.ctx)}</div>` : ""}
-            ${t.en && !t.saved ? `<button class="btn" data-vtip="${v.id}:${i}">存到学习库</button>` : ""}
-            ${t.saved ? `<span class="saved-mark">已存 ✓</span>` : ""}
-          </li>`).join("")}
-      </ul>` : ""}
+      <div data-vtips="${v.id}"></div>
     </div>`;
 }
 function bindVocabEntry(main, v) {
@@ -157,21 +142,11 @@ function bindVocabEntry(main, v) {
     if (v.saved) return;
     vocabToCard(v); save(); render();
   });
-  const all = q(`[data-vtipall="${v.id}"]`);
-  if (all) all.addEventListener("click", () => {
-    let n = 0;
-    (v.fb || []).forEach(t => {
-      if (t.en && !t.saved) { addCard(t.en, t.zh, t.ctx || `生词「${v.display}」的造句点评`, "vtip"); t.saved = true; n++; }
+  const vt = q(`[data-vtips="${v.id}"]`);
+  if (vt && v.fb && v.fb.length) {
+    renderTipsSaver(vt, v.fb, {
+      type: "vtip", ctxFallback: "生词「" + v.display + "」的造句点评",
+      itemLabel: "存到学习库", saveAllLabel: "一键全部存到学习库",
     });
-    save(); render();
-    if (n) toast(`已存 ${n} 条到表达库 ✓`);
-  });
-  main.querySelectorAll(`[data-vtip^="${v.id}:"]`).forEach(b =>
-    b.addEventListener("click", () => {
-      const idx = Number(b.dataset.vtip.split(":")[1]);
-      const t = (v.fb || [])[idx];
-      if (!t || t.saved) return;
-      addCard(t.en, t.zh, t.ctx || `生词「${v.display}」的造句点评`, "vtip");
-      t.saved = true; save(); render();
-    }));
+  }
 }
