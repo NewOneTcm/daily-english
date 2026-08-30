@@ -1,0 +1,146 @@
+/* ---- 精读：粘贴自定义文本，可累积多篇，点词/划词学习 ---- */
+let ereadOpen = null; // 当前展开的文本 id
+
+function renderERead(main) {
+  state.readTexts = state.readTexts || [];
+  // 旧单篇字段迁移
+  if (state.readText && !state.readTexts.some(x => x.text === state.readText)) {
+    state.readTexts.unshift({ id: state.nextReadId++, text: state.readText, added: todayKey() });
+    state.readText = "";
+    save();
+  }
+  main.innerHTML = `
+    <div class="card">
+      <div class="section-title">粘贴一篇新的英文，加入精读</div>
+      <textarea id="rtInput" style="min-height:90px" placeholder="粘贴你想读的英文：文章、邮件、推文、产品文档…"></textarea>
+      <div class="btn-row">
+        <button class="btn primary" id="rtAdd">保存并开始读</button>
+      </div>
+      <p class="hint">读过的文本都保留在下面，随时回来重读。读的时候：<b>划选单词或句子</b>弹出 AI 解释，可存生词库；或点「AI 提取生词词组」批量提取，存表达库。</p>
+    </div>
+    <div id="rtList"></div>`;
+  $("#rtAdd").addEventListener("click", () => {
+    const v = $("#rtInput").value.trim();
+    if (!v) { alert("先粘贴文本"); return; }
+    state.readTexts.unshift({ id: state.nextReadId++, text: v, added: todayKey() });
+    ereadOpen = state.readTexts[0].id;
+    save(); render();
+  });
+  const list = $("#rtList");
+  if (!state.readTexts.length) { list.innerHTML = '<div class="empty">还没有保存的文本。</div>'; return; }
+  state.readTexts.forEach(item => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const open = ereadOpen === item.id;
+    const preview = item.text.replace(/\s+/g, " ").slice(0, 90);
+    card.innerHTML = `
+      <div class="row" style="justify-content:space-between">
+        <div style="font-size:13px;color:var(--ink-2)">${esc(item.added || "")} · ${countWords(item.text)} 词</div>
+        <div class="row" style="gap:6px">
+          <button class="btn ghost" data-ai>AI 提取生词词组</button>
+          <button class="btn ghost" data-toggle>${open ? "收起 ▴" : "展开 ▾"}</button>
+          <button class="btn ghost danger" data-del>删除</button>
+        </div>
+      </div>
+      ${open ? "" : `<div class="hist-text" style="margin-top:8px">${esc(preview)}${item.text.length > 90 ? "…" : ""}</div>`}
+      <div class="rt-body" style="display:${open ? "" : "none"};margin-top:10px"></div>`;
+    card.querySelector("[data-toggle]").addEventListener("click", () => { ereadOpen = open ? null : item.id; render(); });
+    card.querySelector("[data-del]").addEventListener("click", () => {
+      if (!confirm("删除这篇精读文本？")) return;
+      state.readTexts = state.readTexts.filter(x => x.id !== item.id);
+      if (ereadOpen === item.id) ereadOpen = null;
+      save(); render();
+    });
+    card.querySelector("[data-ai]").addEventListener("click", e => runAiExtract(item.id, e.target));
+    list.appendChild(card);
+    if (open) paintReadView(card.querySelector(".rt-body"), item);
+    paintEreadTips(card.querySelector(".rt-body"), item); // 提取结果跟随文章一起折叠
+  });
+}
+
+function paintReadView(box, item) {
+  const text = item.text;
+  box.innerHTML = `<div class="read-text" data-readbody>${esc(text).replace(/\n/g, "<br>")}</div>`;
+  // 划选词句 → AI 解释弹窗（复用阅读模块的划词功能）
+  bindPassageSelect(box.querySelector("[data-readbody]"), text);
+}
+
+function paintEreadTips(box, item) {
+  const tips = item.tips; // 存在文本上，切走再回来不丢
+  if (!tips || !tips.length) return;
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <div class="row" style="justify-content:space-between;margin-top:14px">
+      <div class="section-title" style="margin:0">AI 提取的学习点</div>
+      <button class="btn primary" data-saveall>一键全部存入表达库</button>
+    </div>
+    <ul class="tips">
+      ${tips.map((t, i) => `
+        <li>
+          <div class="tip-zh">${esc(t.en)} <span style="color:var(--ink-2);font-weight:400">— ${esc(t.zh)}</span></div>
+          ${t.ctx ? `<div class="tip-en">${esc(t.ctx)}</div>` : ""}
+          ${cardExists(t.en)
+            ? `<span class="saved-mark">已存在</span>`
+            : `<button class="btn primary" data-rt="${i}">存入表达库</button>`}
+        </li>`).join("")}
+    </ul>`;
+  box.appendChild(div);
+  const markSaved = (b, text) => {
+    const m = document.createElement("span");
+    m.className = "saved-mark";
+    m.textContent = text;
+    b.replaceWith(m);
+  };
+  div.querySelectorAll("[data-rt]").forEach(b =>
+    b.addEventListener("click", () => {
+      const t = tips[Number(b.dataset.rt)];
+      if (cardExists(t.en)) { markSaved(b, "已存在"); return; }
+      addCard(t.en, t.zh, t.ctx, "expr");
+      save();
+      markSaved(b, "已存 ✓");
+    }));
+  div.querySelector("[data-saveall]").addEventListener("click", e => {
+    let added = 0, dup = 0;
+    tips.forEach(t => {
+      if (cardExists(t.en)) dup++;
+      else { addCard(t.en, t.zh, t.ctx, "expr"); added++; }
+    });
+    save();
+    div.querySelectorAll("[data-rt]").forEach(b => markSaved(b, "已存 ✓"));
+    toast("存入 " + added + " 条" + (dup ? "，" + dup + " 条已存在跳过" : ""));
+    const done = document.createElement("span");
+    done.className = "saved-mark";
+    done.textContent = "已全部存入 ✓";
+    e.target.replaceWith(done);
+  });
+}
+
+async function runAiExtract(textId, btn) {
+  const item = (state.readTexts || []).find(x => x.id === textId);
+  if (!item) return;
+  btn.disabled = true; btn.textContent = "提取中…";
+  try {
+    const content = await aiChat([
+      { role: "system", content: "你是英语老师。从用户给的英文文本中挑选 5-10 个最值得学习的生词或词组，每条一行，格式严格为：英文 || 中文释义 || 包含它的原句片段。不要输出其他内容。" },
+      { role: "user", content: item.text.slice(0, 4000) },
+    ]);
+    const tips = content.split(/\n+/).map(l => l.replace(/^[-*\d.\s、]+/, "")).filter(l => l.includes("||"))
+      .map(l => { const p = l.split("||").map(s => s.trim()); return { en: p[0] || "", zh: p[1] || "", ctx: (p[2] || "").slice(0, 140) }; });
+    if (!tips.length) throw new Error("AI 返回格式无法解析");
+    // 修复：例句必须包含目标词，否则回退到原文中含该词的句子，找不到就不显示
+    const srcSents = splitSentences(item.text);
+    tips.forEach(t => {
+      const probe = (t.en || "").trim().toLowerCase();
+      if (!probe) { t.ctx = ""; return; }
+      if (t.ctx && t.ctx.toLowerCase().includes(probe)) return;
+      const found = srcSents.find(s => s.toLowerCase().includes(probe));
+      t.ctx = found ? found.slice(0, 160) : "";
+    });
+    item.tips = tips;
+    save();
+  } catch (e) {
+    alert("提取失败：" + e.message);
+  }
+  btn.disabled = false; btn.textContent = "AI 提取生词词组";
+  render();
+}

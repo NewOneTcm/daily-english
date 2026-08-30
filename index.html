@@ -46,8 +46,8 @@
     padding: 4px; margin-bottom: 18px;
   }
   nav.tabs button {
-    flex: 1; border: none; background: none; padding: 8px 4px;
-    font-size: 14px; color: var(--ink-2); border-radius: 6px; cursor: pointer;
+    flex: 1; border: none; background: none; padding: 8px 1px;
+    font-size: 13px; color: var(--ink-2); border-radius: 6px; cursor: pointer;
     font-family: inherit;
   }
   nav.tabs button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
@@ -192,6 +192,49 @@
   .stat span { font-size: 12px; color: var(--ink-2); }
   .stat.amber b { color: var(--amber); }
 
+  /* 日历（日记） */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-grid .dow { text-align: center; font-size: 12px; color: var(--ink-2); padding: 4px 0; }
+  .cal-day {
+    aspect-ratio: 1; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); font-size: 13px; cursor: pointer; position: relative;
+    font-family: inherit; color: var(--ink);
+  }
+  .cal-day:hover { border-color: var(--accent); }
+  .cal-day.sel { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .cal-day.today { font-weight: 700; color: var(--accent); }
+  .cal-day .dot { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+  .cal-day.blank { visibility: hidden; }
+
+  /* 精读 */
+  .read-text { font-size: 16px; line-height: 2.05; word-break: break-word; }
+  .read-text .w { cursor: pointer; border-radius: 3px; padding: 0 1px; }
+  .read-text .w:hover { background: var(--accent-soft); }
+  .read-text .w.new { background: #fdf3e3; border-bottom: 1px dashed var(--amber); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip {
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+    font-size: 13px; cursor: pointer; background: #fff; font-family: inherit; color: var(--ink);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* 影子跟读 */
+  .shad-progress { text-align: center; color: var(--ink-2); font-size: 13px; }
+  .shad-sentence {
+    font-size: 18px; line-height: 1.8; text-align: center;
+    padding: 18px 8px 10px; min-height: 64px; font-weight: 600;
+  }
+  .rate-row { display: flex; gap: 6px; justify-content: center; margin: 6px 0; flex-wrap: wrap; }
+  .rate-row .btn { padding: 4px 12px; font-size: 13px; font-weight: 500; }
+  .rate-row .btn.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  /* 听力复习 */
+  .lr-item { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; margin-top: 10px; background: #fbfcfb; }
+  .lr-text { font-size: 15px; line-height: 1.7; filter: blur(5px); user-select: none; transition: filter .2s; }
+  .lr-text:hover { filter: blur(2px); }
+  .lr-text.show { filter: none; user-select: text; }
+
   /* 自主加练 */
   .skill-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
   @media (max-width: 560px) { .skill-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -265,6 +308,8 @@
 <div class="wrap" id="app"></div>
 
 <script src="b2-reading.js"></script>
+<script src="js/journal.js"></script>
+<script src="js/eread.js"></script>
 <script>
 "use strict";
 
@@ -289,7 +334,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, journal: {}, readText: "", readTexts: [], nextReadId: 1, listenReview: [], nextLrId: 1, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -597,6 +642,10 @@ function analyzeWriting(text, level) {
 function addCard(en, zh, ctx, type = "expr") {
   state.cards.push({ id: state.nextCardId++, en, zh, ctx, type, step: 0, due: todayKey(), added: todayKey() });
 }
+function cardExists(en) {
+  const k = String(en || "").trim().toLowerCase();
+  return state.cards.some(c => String(c.en || "").trim().toLowerCase() === k);
+}
 
 /* ============ AI 深度点评（可选，兼容 OpenAI 格式接口） ============ */
 // 请求 + 解析，解析失败自动重试（模型偶发返回空内容/markdown 包裹时，不用再手动点第二次）
@@ -746,7 +795,6 @@ const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
 
 /* ============ 渲染 ============ */
 let tab = "today";
-let review = null; // {queue:[card], idx, showA}
 let extraPick = null; // 自主加练进行中：{skill, idx, startedAt, draft}
 let extraDone = null; // 刚完成的加练会话，停留在战果登记页
 
@@ -755,7 +803,7 @@ function render() {
   if (!state.level) { app.innerHTML = viewOnboarding(); bindOnboarding(); return; }
 
   const s = streak();
-  const due = dueCards().length;
+  const due = (state.listenReview || []).length; // 复习角标 = 听力复习队列
   const vp = (state.vocab || []).filter(v => !(v.example || "").trim()).length; // 待造句的生词数
   app.innerHTML = `
     <header class="top">
@@ -766,6 +814,8 @@ function render() {
     </header>
     <nav class="tabs">
       <button data-tab="today" class="${tab === "today" ? "active" : ""}">今天</button>
+      <button data-tab="journal" class="${tab === "journal" ? "active" : ""}">日记</button>
+      <button data-tab="eread" class="${tab === "eread" ? "active" : ""}">精读</button>
       <button data-tab="extra" class="${tab === "extra" ? "active" : ""}">加练</button>
       <button data-tab="review" class="${tab === "review" ? "active" : ""}">复习${due ? `<span class="badge">${due}</span>` : ""}</button>
       <button data-tab="cards" class="${tab === "cards" ? "active" : ""}">表达库</button>
@@ -776,11 +826,13 @@ function render() {
     <main id="main"></main>`;
 
   app.querySelectorAll("nav.tabs button").forEach(b =>
-    b.addEventListener("click", () => { tab = b.dataset.tab; if (tab !== "review") review = null; render(); }));
+    b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
   $("#levelBtn").addEventListener("click", changeLevel);
 
   const main = $("#main");
   if (tab === "today") renderToday(main);
+  else if (tab === "journal") renderJournal(main);
+  else if (tab === "eread") renderERead(main);
   else if (tab === "extra") renderExtra(main);
   else if (tab === "review") renderReview(main);
   else if (tab === "cards") renderCards(main);
@@ -868,7 +920,7 @@ function renderToday(main) {
   const metaText =
     task.t === "说" ? `建议时长 ≥ ${lv.secs} 秒 · 说完打卡` :
     task.t === "写" ? `目标 ≥ ${lv.words} 个词 · 写完打卡` :
-    task.t === "听" ? "先别看原文，盲听 2-3 遍，再完成检验" :
+    task.t === "听" ? "影子跟读：逐句听 + 跟读，可单句循环调速" :
     "读完后用英语回应（写或说都算）";
   main.innerHTML = upgradeBanner + `
     <div class="card">
@@ -951,44 +1003,102 @@ function renderSpeakArea(area, day, task, extra) {
 }
 
 function renderListenArea(area, day, task, extra) {
-  const rate = SPEECH_RATE[state.level] || 1;
+  // 影子跟读模式：逐句 听 → 不看原文跟读 → 卡住再看原文
+  const sentences = splitSentences(task.passage || "");
+  const RATES = [0.7, 0.85, 1, 1.15];
+  const base = SPEECH_RATE[state.level] || 1;
+  let rate = RATES.reduce((a, b) => Math.abs(b - base) < Math.abs(a - base) ? b : a);
+  let idx = Math.min(day.shadowIdx || 0, Math.max(0, sentences.length - 1));
+  let showText = false, loop = false, playing = false;
+
   area.innerHTML = `
-    <div class="row" style="justify-content:center;gap:12px;margin:4px 0 2px">
-      <button class="btn primary" id="playBtn">▶ 播放</button>
-      <button class="btn ghost" id="showTextBtn">显示原文</button>
+    <p class="hint" style="text-align:center;margin:0 0 4px">影子跟读：播一句 → 不看原文跟读 → 卡住再瞄原文 → 下一句</p>
+    <div class="shad-progress" id="shadProg"></div>
+    <div class="shad-sentence" id="shadSent"></div>
+    <div class="rate-row">
+      ${RATES.map(r => `<button class="btn rate-btn" data-rate="${r}">×${r}</button>`).join("")}
+      <button class="btn" id="loopBtn">🔁 关</button>
     </div>
-    <p class="hint" style="text-align:center">语速 ×${rate} · 先别看原文，听 2-3 遍</p>
-    <div id="passageBox" class="hist-text" style="display:none;margin-top:10px">${esc(task.passage)}</div>
-    <textarea id="draft" style="margin-top:12px;min-height:80px" placeholder="检验区：回答问题 / 写下听到的关键点 / 复述大意…">${esc(day.draft || "")}</textarea>
+    <div class="btn-row" style="justify-content:center;margin-top:6px">
+      <button class="btn" id="prevBtn">◀ 上一句</button>
+      <button class="btn primary" id="playBtn">▶ 播放</button>
+      <button class="btn" id="nextBtn">下一句 ▶</button>
+    </div>
+    <div class="btn-row" style="justify-content:center;margin-top:6px">
+      <button class="btn ghost" id="showTextBtn">显示本句原文</button>
+      <button class="btn ghost" id="playAllBtn">▶ 整篇连播</button>
+      <button class="btn ghost" id="markHardBtn">不熟 · 加入复习</button>
+    </div>
+    <textarea id="draft" style="margin-top:12px;min-height:70px" placeholder="卡壳的句子、想记住的表达，记在这里…">${esc(day.draft || "")}</textarea>
     <div class="btn-row">
-      <button class="btn primary" id="finishBtn">听完了，打卡</button>
+      <button class="btn primary" id="finishBtn">跟读完了，打卡</button>
     </div>`;
-  const playBtn = $("#playBtn");
-  playBtn.addEventListener("click", () => {
-    if (!window.speechSynthesis) { alert("当前浏览器不支持语音播放，换 Edge 或 Chrome 试试"); return; }
-    if (speechSynthesis.speaking) { speechSynthesis.cancel(); playBtn.textContent = "▶ 播放"; return; }
-    const u = new SpeechSynthesisUtterance(task.passage);
-    u.lang = "en-US"; u.rate = rate;
-    const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith("en"));
-    if (v) u.voice = v;
-    u.onend = () => { playBtn.textContent = "▶ 再听一遍"; };
-    speechSynthesis.speak(u);
-    playBtn.textContent = "⏸ 停止";
-  });
-  $("#showTextBtn").addEventListener("click", () => {
-    const box = $("#passageBox");
-    const show = box.style.display === "none";
-    box.style.display = show ? "block" : "none";
-    $("#showTextBtn").textContent = show ? "收起原文" : "显示原文";
-  });
-  const ta = $("#draft");
-  ta.addEventListener("input", () => { day.draft = ta.value; save(); });
-  $("#finishBtn").addEventListener("click", () => {
+
+  const $s = sel => area.querySelector(sel);
+  function paint() {
+    $s("#shadProg").textContent = "第 " + (idx + 1) + " / " + sentences.length + " 句";
+    $s("#shadSent").innerHTML = showText
+      ? esc(sentences[idx])
+      : '<span style="color:var(--ink-2);font-weight:400">（先听，跟不上再点「显示本句原文」）</span>';
+    $s("#showTextBtn").textContent = showText ? "隐藏原文" : "显示本句原文";
+    $s("#loopBtn").textContent = loop ? "🔁 开" : "🔁 关";
+    area.querySelectorAll(".rate-btn").forEach(b => b.classList.toggle("on", Number(b.dataset.rate) === rate));
+    $s("#prevBtn").disabled = idx === 0;
+    $s("#nextBtn").disabled = idx >= sentences.length - 1;
+    day.shadowIdx = idx; save();
+  }
+  function stopSpeak() {
+    loop = false;
     if (window.speechSynthesis) speechSynthesis.cancel();
+    playing = false;
+    const pb = $s("#playBtn"); if (pb) pb.textContent = "▶ 播放";
+  }
+  function playCur() {
+    playing = true; $s("#playBtn").textContent = "⏸ 停止";
+    day.shadowPlays = day.shadowPlays || {};
+    day.shadowPlays[idx] = (day.shadowPlays[idx] || 0) + 1;
+    if (day.shadowPlays[idx] === 4) {
+      if (addListenReview(sentences[idx], todayKey())) toast("这句听得有点多，已加入听力复习");
+    }
+    speakOnce(sentences[idx], rate, () => {
+      playing = false; $s("#playBtn").textContent = "▶ 播放";
+      if (loop) setTimeout(() => { if (loop) playCur(); }, 700);
+    });
+  }
+  $s("#playBtn").addEventListener("click", () => {
+    if (playing) { stopSpeak(); paint(); return; }
+    playCur();
+  });
+  $s("#prevBtn").addEventListener("click", () => { if (idx > 0) { idx--; paint(); playCur(); } });
+  $s("#nextBtn").addEventListener("click", () => { if (idx < sentences.length - 1) { idx++; paint(); playCur(); } });
+  $s("#showTextBtn").addEventListener("click", () => { showText = !showText; paint(); });
+  $s("#markHardBtn").addEventListener("click", () => {
+    if (addListenReview(sentences[idx], todayKey())) toast("已加入听力复习，去「复习」页多练几遍");
+    else toast("这句已经在复习列表里了");
+  });
+  $s("#loopBtn").addEventListener("click", () => { loop = !loop; paint(); });
+  area.querySelectorAll(".rate-btn").forEach(b =>
+    b.addEventListener("click", () => { rate = Number(b.dataset.rate); paint(); playCur(); }));
+  $s("#playAllBtn").addEventListener("click", () => {
+    stopSpeak();
+    let i = 0;
+    const step = () => {
+      if (i >= sentences.length) { playing = false; $s("#playBtn").textContent = "▶ 播放"; paint(); return; }
+      idx = i; paint();
+      playing = true; $s("#playBtn").textContent = "⏸ 停止";
+      speakOnce(sentences[i], rate, () => { i++; step(); });
+    };
+    step();
+  });
+  const ta = $s("#draft");
+  ta.addEventListener("input", () => { day.draft = ta.value; save(); });
+  $s("#finishBtn").addEventListener("click", () => {
+    stopSpeak();
     day.draft = ta.value;
     if (extra) { finishExtra(day, task, 0); return; }
     finishDaily(day, task, 0);
   });
+  paint();
 }
 
 /* ---- 雅思式阅读题：短文 + 判断题/单选/简答 ---- */
@@ -1437,8 +1547,51 @@ function speakText(text, rate = 0.9) {
   if (v) u.voice = v;
   speechSynthesis.speak(u);
 }
+
+/* ---- 影子跟读 / 精读 工具 ---- */
+function splitSentences(text) {
+  const parts = String(text).match(/[^.!?…]+[.!?…]+["'”’)\]]?\s*/g);
+  return (parts || [String(text)]).map(s => s.trim()).filter(Boolean);
+}
+function speakOnce(text, rate, onend) {
+  if (!window.speechSynthesis) { if (onend) onend(); return; }
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "en-US"; u.rate = rate;
+  const v = speechSynthesis.getVoices().find(v => v.lang && v.lang.toLowerCase().startsWith("en"));
+  if (v) u.voice = v;
+  u.onend = () => { if (onend) onend(); };
+  u.onerror = () => { if (onend) onend(); };
+  speechSynthesis.speak(u);
+}
+async function aiChat(messages) {
+  const ai = state.ai || {};
+  if (!ai.base || !ai.model || (!ai.key && !/^(\/|https?:\/\/(127\.0\.0\.1|localhost))/i.test(ai.base))) {
+    throw new Error("先在「记录」页配置 AI 接口");
+  }
+  const headers = { "Content-Type": "application/json" };
+  if (ai.key) headers["Authorization"] = "Bearer " + ai.key;
+  const resp = await fetch(ai.base.replace(/\/+$/, "") + "/chat/completions", {
+    method: "POST", headers, body: JSON.stringify({ model: ai.model, messages }),
+  });
+  if (!resp.ok) throw new Error("HTTP " + resp.status + " " + (await resp.text()).slice(0, 120));
+  const data = await resp.json();
+  return (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "";
+}
+
+// 常用词表（精读时用于标出候选生词；宁多勿少，避免误标）
+const COMMON_WORDS = new Set(("the be to of and a an in that have i it for not on with he as you do at this but his by from they we say her she or will my one all would there their what so up out if about who get which go me when make can like time no just him know take people into year your good some could them see other than then now look only come its over think also back after use two how our work first well way even new want because any these give day most us is are was were been has had did said each many more much very where through before right too mean old same tell does set three own under still while life hand part here why ask went men read need land home move try kind again play small put end place made name act ago air off big help line turn show every live point page got high such far form below last keep never start city add food between best left along might close thing side feet car care let run book took idea face fact street miss art away feel talk soon note wait plan body music color stand sun fish area mark dog horse bird once base hear cut sure watch free hour true lead hot sit fall hold paper top hard ship mind five step morning pass road map rain rule pull cold paid sky word list song wind rock space fast north south table fill east love money serve appear science during learn plant cover call past ball star box field rest able pound done beauty drive stood contain front teach week final gave green oh quick develop ocean warm minute strong special behind clear tail produce inches stay nothing course wheel full force blue object decide surface deep moon island foot system busy test record boat common gold possible plane instead dry though laugh thousand ran check game shape equate brought heat snow tire bring yes distant paint language among unit power town certain fly cry dark machine figure oil already product numeral class measure government company person group problem world country question school family student children story example mother father friend night water room house picture mountain boy girl door tree answer found study earth light head letter number piece change important following few enough above sometimes young direct pose river second carry eat began stop wood main plain usual ready red questions complete half order fire told knew since whole king heard best hundred remember early west ground interest reach listen six ten simple several vowel toward war lay against pattern slow center govern notice voice noun correct wonder stead among done final sleep fact inch multiply object wheel boat stead wonder laugh thousand check heat snow fill east paint language week develop sleep warm free strong special produce street today tomorrow yesterday today tonight week weekend month morning afternoon evening breakfast lunch dinner coffee tea water apple banana orange rice bread meat milk egg juice phone computer internet email message meeting office boss colleague project deadline schedule hobby movie music book shop store restaurant hospital station airport ticket train bus subway walk run swim cook clean wash buy sell pay cost cheap expensive happy sad angry tired busy free sorry thank please hello sorry excuse welcome yes no maybe really actually basically probably definitely usually often sometimes rarely never always everywhere somewhere anywhere nobody somebody everybody everything something anything nothing").split(/\s+/));
+function isCommonWord(w) {
+  w = w.toLowerCase();
+  if (COMMON_WORDS.has(w)) return true;
+  for (const suf of ["'s", "s", "es", "ed", "ing", "ly", "er", "est", "ies"]) {
+    if (w.length > suf.length + 2 && w.endsWith(suf) && COMMON_WORDS.has(w.slice(0, -suf.length))) return true;
+  }
+  return false;
+}
 function bindPassageSelect(box, passage) {
   if (!box) return;
+  box.classList.add("selbox");
   box.addEventListener("mouseup", () => {
     setTimeout(() => {
       const sel = window.getSelection && window.getSelection();
@@ -1455,7 +1608,7 @@ function bindPassageSelect(box, passage) {
   if (!bindPassageSelect._docBound) {
     bindPassageSelect._docBound = true;
     document.addEventListener("mousedown", e => {
-      if (selPopupEl && !selPopupEl.contains(e.target) && !(e.target && e.target.closest && e.target.closest("#passageBox"))) hideSelPopup();
+      if (selPopupEl && !selPopupEl.contains(e.target) && !(e.target && e.target.closest && e.target.closest("#passageBox, .selbox"))) hideSelPopup();
     });
   }
 }
@@ -1707,71 +1860,73 @@ function bindQuickAdd(root) {
 }
 
 /* ---- 复习 ---- */
-function startReview() {
-  const queue = dueCards();
-  review = { queue, idx: 0, showA: false };
-}
-function gradeCard(card, grade) {
-  // grade: 0 忘了 / 1 模糊 / 2 记得
-  if (grade === 0) { card.step = 1; card.due = todayKey(1); }
-  else if (grade === 1) {
-    const gap = Math.max(1, Math.floor(REVIEW_STEPS[Math.min(card.step, REVIEW_STEPS.length - 1)] / 2));
-    card.due = todayKey(gap);
-  } else {
-    card.step = Math.min(card.step + 1, REVIEW_STEPS.length - 1);
-    card.due = todayKey(REVIEW_STEPS[card.step]);
-  }
+/* ---- 听力复习队列 ---- */
+function addListenReview(text, from) {
+  text = String(text || "").trim();
+  if (!text) return false;
+  state.listenReview = state.listenReview || [];
+  if (state.listenReview.some(it => it.text === text)) return false;
+  state.listenReview.push({ id: state.nextLrId++, text, from: from || "", added: todayKey(), plays: 0 });
   save();
+  return true;
 }
+
+/* ---- 复习页：表达/生词只导出 SuperMemo；站内复习 = 听力 shadowing ---- */
 function renderReview(main) {
-  const due = dueCards();
-  if (!review) {
-    main.innerHTML = `
-      <div class="card" style="text-align:center;padding:34px 20px">
-        <h2 style="font-size:18px">${due.length ? `有 ${due.length} 条表达等你回忆` : "今天没有到期的表达"}</h2>
-        <p class="hint" style="margin-top:6px">规则：看中文 → 开口说出英文 → 再对答案。<b>说出口</b>才算数。</p>
-        ${due.length ? `<div class="btn-row" style="justify-content:center"><button class="btn primary" id="startRv">开始复习（约 ${Math.max(1, Math.round(due.length * 0.4))} 分钟）</button></div>` : ""}
-        <div class="btn-row" style="justify-content:center">
-          <button class="btn ghost" id="exportSm">导出 SuperMemo 文件</button>
-        </div>
-      </div>`;
-    const st = $("#startRv"); if (st) st.addEventListener("click", () => { startReview(); render(); });
-    $("#exportSm").addEventListener("click", () => exportSuperMemo(false));
-    return;
-  }
-  if (review.idx >= review.queue.length) {
-    const n = review.queue.length;
-    review = null;
-    main.innerHTML = `
-      <div class="card done-hero">
-        <div class="big">🎉</div>
-        <h2>${n} 条全部过完</h2>
-        <p>内置复习是轻量的。想上强度，随时把表达库导给 SuperMemo。</p>
-      </div>`;
-    return;
-  }
-  const card = review.queue[review.idx];
+  const lr = state.listenReview || [];
   main.innerHTML = `
     <div class="card">
-      <div class="hint" style="text-align:center">${review.idx + 1} / ${review.queue.length}</div>
-      <div class="review-q">${esc(card.zh)}</div>
-      ${card.ctx ? `<div class="review-ctx">语境：${esc(card.ctx)}</div>` : ""}
-      ${review.showA
-        ? `<div class="review-a">${esc(card.en)}</div>
-           <div class="grade-row btn-row">
-             <button class="btn danger" data-grade="0">忘了</button>
-             <button class="btn" data-grade="1">模糊</button>
-             <button class="btn primary" data-grade="2">记得</button>
-           </div>`
-        : `<div class="btn-row" style="justify-content:center"><button class="btn primary" id="showA">说出英文后，点我看答案</button></div>`}
+      <div class="section-title">表达 / 生词 → 导出 SuperMemo</div>
+      <p class="hint" style="margin-top:0">表达和生词不在站内复习了，统一导给 SuperMemo 做长期记忆。当前共 ${state.cards.length} 条可导出。</p>
+      <div class="btn-row" style="margin-top:6px">
+        <button class="btn primary" id="exportSm">导出 SuperMemo 文件</button>
+        <button class="btn ghost" id="goCards">去表达库勾选导出 →</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-title">听力复习（${lr.length}）</div>
+      <p class="hint" style="margin-top:0">跟读时反复听仍不熟的句子在这里继续练：播放 → 跟读 → 必要时显示原文对照，熟了点「已掌握」。</p>
+      <div id="lrList"></div>
     </div>`;
-  const sa = $("#showA");
-  if (sa) sa.addEventListener("click", () => { review.showA = true; render(); });
-  main.querySelectorAll("[data-grade]").forEach(b =>
-    b.addEventListener("click", () => {
-      gradeCard(card, Number(b.dataset.grade));
-      review.idx++; review.showA = false; render();
-    }));
+  $("#exportSm").addEventListener("click", () => exportSuperMemo(false));
+  $("#goCards").addEventListener("click", () => { tab = "cards"; render(); });
+  const list = $("#lrList");
+  if (!lr.length) {
+    list.innerHTML = '<div class="empty">还没有句子。做听力任务时，跟不下来的句子点「不熟 · 加入复习」；同一句听 4 遍以上也会自动进来。</div>';
+    return;
+  }
+  const rate = SPEECH_RATE[state.level] || 1;
+  list.innerHTML = lr.map(it => `
+    <div class="lr-item" data-id="${it.id}">
+      <div class="lr-text" data-lrtext>${esc(it.text)}</div>
+      <div class="row" style="margin-top:8px;gap:6px;flex-wrap:wrap">
+        <button class="btn primary" data-lrplay>▶ 播放</button>
+        <button class="btn ghost" data-lrshow>显示原文</button>
+        <span class="hint" style="margin:0" data-lrplays>已练 ${it.plays || 0} 遍</span>
+        <div class="spacer"></div>
+        <button class="btn ghost danger" data-lrdel>已掌握 ✓</button>
+      </div>
+    </div>`).join("");
+  list.querySelectorAll(".lr-item").forEach(el => {
+    const id = Number(el.dataset.id);
+    const it = (state.listenReview || []).find(x => x.id === id);
+    if (!it) return;
+    const textEl = el.querySelector("[data-lrtext]");
+    el.querySelector("[data-lrplay]").addEventListener("click", () => {
+      speakOnce(it.text, rate);
+      it.plays = (it.plays || 0) + 1;
+      save();
+      el.querySelector("[data-lrplays]").textContent = "已练 " + it.plays + " 遍";
+    });
+    el.querySelector("[data-lrshow]").addEventListener("click", () => {
+      const show = textEl.classList.toggle("show");
+      el.querySelector("[data-lrshow]").textContent = show ? "隐藏原文" : "显示原文";
+    });
+    el.querySelector("[data-lrdel]").addEventListener("click", () => {
+      state.listenReview = state.listenReview.filter(x => x.id !== id);
+      save(); render();
+    });
+  });
 }
 
 /* ---- 表达库 ---- */
@@ -1824,7 +1979,6 @@ function renderCards(main) {
             ${(() => { const tg = CARD_TAGS[c.type || "expr"] || CARD_TAGS.expr; return `<span class="tag-fb" style="${tg[1]}">${tg[0]}</span>`; })()}
             <span class="en">${esc(c.en)}</span>
             <span class="zh">${esc(c.zh)}</span>
-            <span class="due ${c.due <= t ? "today" : ""}">${c.due <= t ? "待复习" : c.due + " 见"}</span>
             <button class="btn ghost danger" data-del="${c.id}" title="删除">×</button>
           </li>`).join("")}
       </ul>` : `<div class="empty">还什么都没有。每天打卡后顺手留一条，慢慢就攒起来了。</div>`}

@@ -83,6 +83,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self._cors_headers()
         self.send_header("Content-Type", mimetypes.guess_type(fp)[0] or "application/octet-stream")
+        self.send_header("Cache-Control", "no-cache")  # 静态文件禁缓存，改了立刻生效
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
