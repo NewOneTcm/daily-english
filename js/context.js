@@ -109,7 +109,7 @@ async function ctxStage1(cands) {
   const text = await aiChat([
     { role: "system", content: `你是英语教学助手。以下是用户标记过"不熟"的生词候选（按优先级从高到低排列）。请从中挑选 ${CTX_CONFIG.PICK_COUNT} 个词，要求：1. 这些词必须能被自然地放进同一个场景或主题；2. 优先挑选 unknown_count 高的词；3. 如果强行凑满数量会导致场景割裂，允许少选（最少 ${CTX_CONFIG.MIN_PICK_COUNT} 个）；4. 不要造词，不要改变候选词的原形，不要使用候选词表以外的词。严格输出 JSON，不要输出任何多余文字：{"scene":"一句话描述你构思的场景","words":["word1","word2"],"reason":"这些词为何能放进同一场景"}` },
     { role: "user", content: JSON.stringify(candidates) },
-  ]);
+  ], { timeoutMs: 90000, retries: 2 }); // 选词较短，90s 足够
   const r = parseJsonFromAI(text);
   if (!r.scene || !Array.isArray(r.words) || !r.words.length) throw new Error("选词返回格式不对");
   return r;
@@ -127,7 +127,7 @@ async function ctxStage2(words, scene) {
 【文章要求】1. 字数约 500 个英文单词（±10%）；2. 体裁 story；场景：${scene}；难度 CEFR ${level}；3. 除目标词外其余用词明显低于目标词难度，上下文易懂；4. 每个目标词出现 1–3 次，首次出现必须自带语境线索（同义复现/反义对比/举例/定义解释/因果情境）；5. 目标词必须出现在有信息量的句子里；6. 有完整情节或清晰论点，不要写成单词例句拼盘；7. 用常见英文名。
 【输出格式】严格输出 JSON，不要输出多余文字：{"title":"","title_zh":"","content_en":"英文正文，段落间用 \\n\\n 分隔","content_zh":"中文全文翻译","target_words":[{"word":"原形","matched_forms":["文中实际形式"],"first_sentence":"首次出现的完整英文句子","clue_type":"同义复现/反义对比/举例/定义解释/因果情境","sense_zh":"文中义","explanation_zh":"线索说明（30字内）"}]}` },
     { role: "user", content: JSON.stringify(targets) },
-  ]);
+  ], { timeoutMs: 240000, retries: 3, retryDelayMs: 2500 }); // 写 500 字短文最耗时，放宽到 4 分钟、多重试几次
   const r = parseJsonFromAI(text);
   if (!r.content_en || !Array.isArray(r.target_words)) throw new Error("文章返回格式不对");
   return r;
@@ -185,12 +185,11 @@ async function ctxStage2Retry(words, scene, missing) {
   const text = await aiChat([
     { role: "system", content: `你是英语教学助手。为"在语境中巩固生词"写一篇英文短文。场景：${scene}；难度 CEFR ${level}；约 500 词；目标词必须全部出现，每个 1–3 次，首次出现自带语境线索。【特别注意】下面这些词上一版漏了，这次必须出现：${missing.join("、")}。严格输出 JSON：{"title":"","title_zh":"","content_en":"","content_zh":"","target_words":[{"word":"","matched_forms":[],"first_sentence":"","clue_type":"","sense_zh":"","explanation_zh":""}]}` },
     { role: "user", content: JSON.stringify(targets) },
-  ]);
+  ], { timeoutMs: 240000, retries: 3, retryDelayMs: 2500 });
   const r = parseJsonFromAI(text);
   if (!r.content_en || !Array.isArray(r.target_words)) throw new Error("文章返回格式不对");
   return r;
 }
-
 /* ---- 标记与计数回写（文档 §5.4） ---- */
 function ctxMarkWord(articleId, wordId, action) {
   const v = (state.vocab || []).find(x => x.id === wordId);
@@ -245,9 +244,9 @@ function renderCtxHome(main) {
     </div>`;
   const gen = $("#ctxGen");
   if (gen) gen.addEventListener("click", async () => {
-    gen.disabled = true; gen.textContent = "生成中（选词 → 写文章，约 20-40 秒）…";
+    gen.disabled = true; gen.textContent = "生成中（选词 → 写文章，超时自动重试）…";
     try { const art = await ctxGenerate(); if (art) { ctxView.articleId = art.id; render(); } }
-    catch (e) { alert("生成失败：" + e.message); gen.disabled = false; gen.textContent = "生成一篇场景短文"; }
+    catch (e) { alert("生成失败：" + e.message + "\n\n如果是超时/502，模型这次没写完，点「生成」再试一次即可（会自动重试）。"); gen.disabled = false; gen.textContent = "生成一篇场景短文"; }
   });
   main.querySelectorAll("[data-openart]").forEach(li =>
     li.addEventListener("click", () => { ctxView.articleId = Number(li.dataset.openart); render(); }));
