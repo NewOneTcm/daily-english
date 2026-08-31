@@ -272,16 +272,16 @@ function ctxTokenizeHTML(text, targets) {
       candidateForms(t.word).forEach(f => { wordMap[f] = wordMap[f] || t; });
     }
   });
-  // 先匹配短语（按长度降序，先匹配长的避免重叠），记录占位区间
+  // 先匹配短语：在原文上直接找（大小写不敏感、容忍多余空格/连字符），索引与原文对齐
   const hits = []; // { start, end, text, target }
   phrases.forEach(p => {
     p.forms.forEach(f => {
-      const norm = s => s.toLowerCase().replace(/[\s\-]+/g, " ").trim();
-      const hay = norm(text), needle = norm(f);
-      let i = 0;
-      while ((i = hay.indexOf(needle, i)) !== -1) {
-        hits.push({ start: i, end: i + needle.length, text: text.slice(i, i + needle.length), target: p.target });
-        i += needle.length;
+      // 把短语转成正则：单词间允许任意空白/连字符，大小写不敏感
+      const parts = String(f).trim().split(/[\s\-]+/).map(s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      const re = new RegExp(parts.join("[\\s\\-]+"), "gi");
+      let mm;
+      while ((mm = re.exec(text))) {
+        hits.push({ start: mm.index, end: mm.index + mm[0].length, text: mm[0], target: p.target });
       }
     });
   });
