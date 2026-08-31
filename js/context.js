@@ -317,7 +317,12 @@ function renderCtxArticle(main, art) {
     sp.addEventListener("click", () => {
       const id = Number(sp.dataset.cw);
       const t = art.targets.find(x => x.wordId === id);
-      if (t) paintCtxCard($("#ctxCard"), art, t, poolV(id));
+      if (t) {
+        // 点开看解释 = 主动学这个词，记一次"今日新学"（同词一天只记一次）
+        const v = poolV(id);
+        if (v) { const today = todayKey(); if (v.ctxSeenAt !== today) { v.ctxSeenAt = today; v.ctxSeenNew = true; save(); } }
+        paintCtxCard($("#ctxCard"), art, t, v);
+      }
     }));
   $("#ctxAllKnown").addEventListener("click", () => {
     art.targets.forEach(t => { if (!t.marked && t.wordId) ctxMarkWord(art.id, t.wordId, "known"); });

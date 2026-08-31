@@ -6,30 +6,37 @@ function fmtMins(secs) {
   return Math.floor(m / 60) + " 小时 " + (m % 60) + " 分";
 }
 function dayStats(key) {
-  let secs = 0, nw = 0, np = 0, ns = 0, sessions = 0, autoW = 0, autoP = 0;
+  let secs = 0, nw = 0, np = 0, ns = 0, sessions = 0, autoW = 0, autoP = 0, readSecs = 0;
   const d = state.days[key];
   if (d && d.done) { secs += d.secs || 0; nw += d.nw || 0; np += d.np || 0; ns += d.ns || 0; }
   (state.sessions || []).forEach(s => {
     if (s.date === key) { secs += s.secs || 0; nw += s.nw || 0; np += s.np || 0; ns += s.ns || 0; sessions++; }
+  });
+  // 精读 / 场景阅读 的停留时长
+  (state.activities || []).forEach(a => {
+    if (a.date === key) { secs += a.secs || 0; readSecs += a.secs || 0; }
   });
   // 生词库自动计入：当天划词收进来的，单词算 nw、短语算 np
   (state.vocab || []).forEach(v => {
     if (v.added === key) {
       if (/\s/.test(v.display.trim())) { np++; autoP++; } else { nw++; autoW++; }
     }
+    // 场景阅读中当天点开看过解释的词，也计入当天新学
+    if (v.ctxSeenAt === key) { nw++; autoW++; }
   });
-  return { secs, nw, np, ns, sessions, autoW, autoP };
+  return { secs, nw, np, ns, sessions, autoW, autoP, readSecs };
 }
 function allTotals() {
-  let secs = 0, nw = 0, np = 0, ns = 0, done = 0, sessions = 0;
+  let secs = 0, nw = 0, np = 0, ns = 0, done = 0, sessions = 0, readSecs = 0;
   Object.values(state.days).forEach(d => {
     if (d && d.done) { done++; secs += d.secs || 0; nw += d.nw || 0; np += d.np || 0; ns += d.ns || 0; }
   });
   (state.sessions || []).forEach(s => { sessions++; secs += s.secs || 0; nw += s.nw || 0; np += s.np || 0; ns += s.ns || 0; });
+  (state.activities || []).forEach(a => { secs += a.secs || 0; readSecs += a.secs || 0; });
   (state.vocab || []).forEach(v => {
     if (/\s/.test(v.display.trim())) np++; else nw++;
   });
-  return { secs, nw, np, ns, done, sessions };
+  return { secs, nw, np, ns, done, sessions, readSecs };
 }
 function svgBarChart(rows, series, opts = {}) {
   const W = 620, H = 240, padL = 40, padR = 8, padT = 20, padB = 30;
@@ -79,7 +86,7 @@ function renderStats(main) {
     <div class="card">
       <div class="section-title">近 14 天学习时长（分钟 / 天）</div>
       ${svgBarChart(durRows, [{ key: "m", color: "#17795b" }], { min: 5 })}
-      <p class="hint">打卡 + 加练都算。每天几分钟，柱子连成一片就是你的坚持。</p>
+      <p class="hint">打卡 + 加练 + 精读 + 场景阅读 都算。每天几分钟，柱子连成一片就是你的坚持。</p>
     </div>
     <div class="card">
       <div class="section-title">近 14 天新学内容（条 / 天）</div>
@@ -96,7 +103,7 @@ function renderStats(main) {
     </div>
     <div class="card">
       <div class="section-title">今天</div>
-      <p style="font-size:14px">学习 ${fmtMins(today.secs)} · 打卡${dayToday && dayToday.done ? " ✓" : " ✗"} · 加练 ${today.sessions} 次 · 新学 ${today.nw + today.np + today.ns} 条${(today.autoW || today.autoP) ? `（含生词库新收 ${today.autoW} 词 ${today.autoP} 短语）` : ""}</p>
+      <p style="font-size:14px">学习 ${fmtMins(today.secs)} · 打卡${dayToday && dayToday.done ? " ✓" : " ✗"} · 加练 ${today.sessions} 次${today.readSecs ? " · 精读/场景阅读 " + fmtMins(today.readSecs) : ""} · 新学 ${today.nw + today.np + today.ns} 条${(today.autoW || today.autoP) ? `（含生词库新收 ${today.autoW} 词 ${today.autoP} 短语）` : ""}</p>
       ${items ? `<p class="hint" style="margin-top:6px">开工至今攒下 <b style="color:var(--accent)">${items}</b> 个新表达（${tot.nw} 词 · ${tot.np} 短语 · ${tot.ns} 句），总时长 ${fmtMins(tot.secs)}。慢慢来，比较快。</p>` : `<p class="hint" style="margin-top:6px">学完在「今天」或「加练」页记一笔新学内容，这里就会长出你的成就曲线。</p>`}
     </div>`;
 }

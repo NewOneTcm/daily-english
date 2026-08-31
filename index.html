@@ -350,7 +350,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, journal: {}, readText: "", readTexts: [], nextReadId: 1, listenReview: [], nextLrId: 1, ctxArticles: [], nextCtxId: 1, ai: { base: "", key: "", model: "" }, updatedAt: 0 };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, journal: {}, readText: "", readTexts: [], nextReadId: 1, listenReview: [], nextLrId: 1, ctxArticles: [], nextCtxId: 1, activities: [], ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -430,6 +430,38 @@ function nextLevelOf(level) {
 const SKILL_BADGE = { "听": "🎧 听力", "说": "🎙 开口说", "读": "📖 阅读", "写": "✍️ 动笔写" };
 const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
 
+/* ---- 模块时长追踪：精读(eread)/场景阅读(ctx) 停留时长计入统计 ----
+   进入对应 tab 开始计时，切走或页面隐藏时结算落库到 state.activities。 */
+const TRACKED_TABS = { eread: "精读", ctx: "场景阅读" };
+let modTimer = null; // { tab, startedAt }
+function trackModuleTime(currentTab) {
+  const now = Date.now();
+  if (modTimer && modTimer.tab !== currentTab) { // 离开了被追踪的页
+    const secs = Math.round((now - modTimer.startedAt) / 1000);
+    if (secs >= 5) { // 至少 5 秒才记，防误触
+      state.activities = state.activities || [];
+      state.activities.push({ date: todayKey(), module: TRACKED_TABS[modTimer.tab], secs, at: new Date(modTimer.startedAt).toISOString() });
+      save();
+    }
+    modTimer = null;
+  }
+  if (TRACKED_TABS[currentTab] && !modTimer) modTimer = { tab: currentTab, startedAt: now };
+}
+// 页面切后台/关闭时结算
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden" && modTimer) {
+    const secs = Math.round((Date.now() - modTimer.startedAt) / 1000);
+    if (secs >= 5) {
+      state.activities = state.activities || [];
+      state.activities.push({ date: todayKey(), module: TRACKED_TABS[modTimer.tab], secs, at: new Date(modTimer.startedAt).toISOString() });
+      save();
+    }
+    modTimer.startedAt = Date.now(); // 回来时重新起算，不把挂后台时间算进去
+  } else if (document.visibilityState === "visible" && modTimer) {
+    modTimer.startedAt = Date.now();
+  }
+});
+
 /* ============ 渲染 ============ */
 let tab = "today";
 let extraPick = null; // 自主加练进行中：{skill, idx, startedAt, draft}
@@ -466,6 +498,7 @@ function render() {
   app.querySelectorAll("nav.tabs button").forEach(b =>
     b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
   $("#levelBtn").addEventListener("click", changeLevel);
+  trackModuleTime(tab); // 精读/场景阅读等模块时长追踪
 
   const main = $("#main");
   if (tab === "today") renderToday(main);
