@@ -309,6 +309,12 @@
   .ctx-w.ctx-hard { border-bottom-color: #ef4444; background: #fef2f2; } /* 顽固难词：红色底 */
   .ctx-w.ctx-unknown { border-bottom-width: 3px; } /* 本篇标记「还不熟」：加粗 */
   .ctx-w.ctx-known { border-bottom-color: #c8cfcb; opacity: .55; } /* 本篇标记「认识了」：变灰 */
+  /* 场景阅读：点词详情卡固定在页面右侧 */
+  .ctx-detail {
+    position: fixed; right: 18px; top: 120px; width: 320px; max-height: 70vh; overflow: auto;
+    border: 1px solid var(--accent); box-shadow: 0 8px 28px rgba(20,40,30,.16); z-index: 60;
+  }
+  @media (max-width: 760px) { .ctx-detail { position: static; width: auto; max-height: none; margin-top: 14px; box-shadow: none; } }
 </style>
 </head>
 <body>

@@ -13,7 +13,7 @@ const CTX_CONFIG = {
   RECENT_DAYS: 3,
   PICK_COUNT: 10,     // 目标取词数
   MIN_PICK_COUNT: 5,  // 最少取词数
-  MASTERED_STREAK: 3, // 连续认识几次毕业
+  MASTERED_STREAK: 5, // 连续认识几次毕业
 };
 
 /* ---- 词形还原校验（文档 §4.3 兜底方案） ---- */
@@ -87,13 +87,12 @@ function priorityScore(v, now) {
     (daysSince < CTX_CONFIG.RECENT_DAYS ? CTX_CONFIG.W_RECENT_PEN : 0)
   );
 }
-function ctxPickCandidates(limit = 30) {
+function ctxPickCandidates(limit) {
   const now = Date.now();
-  return ctxPracticePool()
+  const ranked = ctxPracticePool()
     .map(v => ({ v, score: priorityScore(v, now) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(x => x.v);
+    .sort((a, b) => b.score - a.score);
+  return (limit ? ranked.slice(0, limit) : ranked).map(x => x.v); // 不传 limit 则返回全部待练池
 }
 
 /* ---- LLM 两阶段生成（文档 §4） ---- */
@@ -136,7 +135,7 @@ async function ctxStage2(words, scene) {
 
 /* ---- 生成入口（含校验 + 重试） ---- */
 async function ctxGenerate() {
-  const cands = ctxPickCandidates(30);
+  const cands = ctxPickCandidates(); // 全部待练生词都交给 LLM 选，不截 30
   if (cands.length < CTX_CONFIG.MIN_PICK_COUNT) {
     alert(`待练的生词只有 ${cands.length} 个，至少 ${CTX_CONFIG.MIN_PICK_COUNT} 个才能生成。\n\n先去「阅读」或「精读」模块划选一些生词吧。`);
     return;
@@ -219,7 +218,7 @@ function renderContext(main) {
   else renderCtxHome(main);
 }
 function renderCtxHome(main) {
-  const pool = ctxPickCandidates(30);
+  const pool = ctxPickCandidates(); // 显示全部待练生词数，不再截 30
   const mastered = (state.vocab || []).filter(v => v.status === "mastered").length;
   main.innerHTML = `
     <div class="card">
@@ -297,6 +296,7 @@ function renderCtxArticle(main, art) {
     </div>
     <div class="card">
       <div class="read-text" id="ctxBody">${ctxTokenizeHTML(art.contentEn, art.targets)}</div>
+      <p class="hint" style="margin-top:8px">💡 也可划选文中任何单词或短语：弹出解释，加入生词库。</p>
       <div class="hist-text" style="margin-top:12px;background:#fbf7f0">${esc(art.contentZh || "")}</div>
       <div id="ctxCard"></div>
       <div class="btn-row" style="margin-top:14px">
@@ -305,6 +305,8 @@ function renderCtxArticle(main, art) {
       </div>
     </div>`;
   $("#ctxBack").addEventListener("click", () => { ctxView.articleId = null; render(); });
+  // 划选任意词句 → 弹 AI 解释 → 加生词库（与阅读/精读共用的独立模块）
+  bindPassageSelect($("#ctxBody"), art.contentEn);
   main.querySelectorAll("[data-cw]").forEach(sp =>
     sp.addEventListener("click", () => {
       const id = Number(sp.dataset.cw);
@@ -326,15 +328,16 @@ function renderCtxArticle(main, art) {
 function paintCtxCard(box, art, t, v) {
   if (!box) return;
   box.innerHTML = `
-    <div class="card" style="border:1px solid var(--accent);margin-top:14px">
+    <div class="card ctx-detail">
       <div class="row" style="justify-content:space-between">
         <div>
           <b class="vocab-word">${esc(t.word)}</b>
           ${v && v.phonetic ? `<span class="phonetic">${esc(v.phonetic)}</span>` : ""}
           ${v ? `<button class="speak-btn" id="ctxSpeak" title="朗读">🔊</button>` : ""}
         </div>
-        ${v ? `<span class="hint">不熟 ${v.unknownCount} 次 · 练过 ${v.exposureCount} 篇</span>` : ""}
+        <button class="btn ghost" id="ctxCardClose" title="关闭" style="padding:0 8px;font-size:18px;line-height:1">×</button>
       </div>
+      ${v ? `<span class="hint">不熟 ${v.unknownCount} 次 · 练过 ${v.exposureCount} 篇</span>` : ""}
       <div class="vocab-sent">文中义：${esc(t.senseZh || "—")} · 线索：${esc(t.clueType || "—")}${t.explanationZh ? " · " + esc(t.explanationZh) : ""}</div>
       ${v && v.explain ? `<div class="vocab-sent">你的标注：${esc(v.explain.split("\n")[0].slice(0, 80))}</div>` : ""}
       ${v && v.sentence ? `<div class="vocab-sent">阅读原句：${esc(v.sentence)}</div>` : ""}
@@ -344,8 +347,10 @@ function paintCtxCard(box, art, t, v) {
         <button class="btn primary" id="ctxKnown">认识了</button>
       </div>
     </div>`;
+  const close = $("#ctxCardClose", box);
+  if (close) close.addEventListener("click", () => { box.innerHTML = ""; });
   const spk = $("#ctxSpeak", box);
   if (spk) spk.addEventListener("click", () => speakText(t.word));
-  $("#ctxUnk", box).addEventListener("click", () => { ctxMarkWord(art.id, t.wordId, "unknown"); render(); });
-  $("#ctxKnown", box).addEventListener("click", () => { ctxMarkWord(art.id, t.wordId, "known"); render(); });
+  $("#ctxUnk", box).addEventListener("click", () => { ctxMarkWord(art.id, t.wordId, "unknown"); box.innerHTML = ""; render(); });
+  $("#ctxKnown", box).addEventListener("click", () => { ctxMarkWord(art.id, t.wordId, "known"); box.innerHTML = ""; render(); });
 }
