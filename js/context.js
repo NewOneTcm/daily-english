@@ -87,12 +87,17 @@ function priorityScore(v, now) {
     (daysSince < CTX_CONFIG.RECENT_DAYS ? CTX_CONFIG.W_RECENT_PEN : 0)
   );
 }
-function ctxPickCandidates(limit) {
+function ctxPickCandidates(limit = 30) {
   const now = Date.now();
-  const ranked = ctxPracticePool()
+  return ctxPracticePool()
     .map(v => ({ v, score: priorityScore(v, now) }))
-    .sort((a, b) => b.score - a.score);
-  return (limit ? ranked.slice(0, limit) : ranked).map(x => x.v); // 不传 limit 则返回全部待练池
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit) // 发给 LLM 只取优先级最高的 30 个（词多了全发会撑爆 token）
+    .map(x => x.v);
+}
+// 待练池真实总数（页面上显示用，与发给 LLM 的 30 个区分开）
+function ctxPoolTotal() {
+  return ctxPracticePool().length;
 }
 
 /* ---- LLM 两阶段生成（文档 §4） ---- */
@@ -135,7 +140,7 @@ async function ctxStage2(words, scene) {
 
 /* ---- 生成入口（含校验 + 重试） ---- */
 async function ctxGenerate() {
-  const cands = ctxPickCandidates(); // 全部待练生词都交给 LLM 选，不截 30
+  const cands = ctxPickCandidates(30); // 发给 LLM 只取优先级最高的 30 个
   if (cands.length < CTX_CONFIG.MIN_PICK_COUNT) {
     alert(`待练的生词只有 ${cands.length} 个，至少 ${CTX_CONFIG.MIN_PICK_COUNT} 个才能生成。\n\n先去「阅读」或「精读」模块划选一些生词吧。`);
     return;
@@ -217,21 +222,23 @@ function renderContext(main) {
   else renderCtxHome(main);
 }
 function renderCtxHome(main) {
-  const pool = ctxPickCandidates(); // 显示全部待练生词数，不再截 30
+  const pool = ctxPickCandidates(30); // 判断够不够生成用 Top30
+  const total = ctxPoolTotal();      // 页面上显示待练池真实总数
   const mastered = (state.vocab || []).filter(v => v.status === "mastered").length;
   main.innerHTML = `
     <div class="card">
       <div class="section-title">场景阅读</div>
       <p class="hint">取生词库里<b>最不熟</b>的词，让 AI 把它们编进同一篇短文，在语境里反复遇见 → 巩固记忆。读完标记「还不熟 / 认识了」，越不熟的词出现频率越高。</p>
       <div class="stat-row" style="margin-top:12px">
-        <div class="stat"><b>${pool.length}</b><span>待练生词</span></div>
+        <div class="stat"><b>${total}</b><span>待练生词</span></div>
         <div class="stat amber"><b>${(state.ctxArticles || []).length}</b><span>已生成文章</span></div>
         <div class="stat"><b>${mastered}</b><span>已掌握</span></div>
       </div>
+      ${total > 30 ? `<p class="hint" style="margin-top:2px">待练生词共 <b>${total}</b> 个，生成时只把<b>优先级最高的 30 个</b>发给 AI 挑选（越不熟越靠前），避免词太多拖慢生成。</p>` : ""}
       <div class="btn-row">
-        <button class="btn primary" id="ctxGen" ${pool.length < CTX_CONFIG.MIN_PICK_COUNT ? "disabled" : ""}>生成一篇场景短文（取最不熟的 ${Math.min(pool.length, CTX_CONFIG.PICK_COUNT)} 词）</button>
+        <button class="btn primary" id="ctxGen" ${total < CTX_CONFIG.MIN_PICK_COUNT ? "disabled" : ""}>生成一篇场景短文（取最不熟的 ${Math.min(total, CTX_CONFIG.PICK_COUNT)} 词）</button>
       </div>
-      ${pool.length < CTX_CONFIG.MIN_PICK_COUNT ? `<p class="hint" style="color:var(--amber)">待练生词不足 ${CTX_CONFIG.MIN_PICK_COUNT} 个。先去「阅读」或「精读」模块划选一些生词加入生词库。</p>` : ""}
+      ${total < CTX_CONFIG.MIN_PICK_COUNT ? `<p class="hint" style="color:var(--amber)">待练生词不足 ${CTX_CONFIG.MIN_PICK_COUNT} 个。先去「阅读」或「精读」模块划选一些生词加入生词库。</p>` : ""}
     </div>
     <div class="card">
       <div class="section-title">历史文章</div>
