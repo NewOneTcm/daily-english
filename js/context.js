@@ -258,22 +258,57 @@ function renderCtxHome(main) {
   main.querySelectorAll("[data-openart]").forEach(li =>
     li.addEventListener("click", () => { ctxView.articleId = Number(li.dataset.openart); render(); }));
 }
-/* 把正文切成 token，目标词包 span（不破坏 HTML） */
+/* 把正文切成 token，目标词包 span（不破坏 HTML）。支持单词 + 多词短语。 */
 function ctxTokenizeHTML(text, targets) {
-  const map = {}; // token(lower) -> target
+  const wordMap = {};   // 单词 token(lower) -> target
+  const phrases = [];   // 短语 [{ target, forms[] }]
   targets.forEach(t => {
-    (t.matchedForms && t.matchedForms.length ? t.matchedForms : [t.word]).forEach(f => { map[String(f).toLowerCase()] = t; });
-    candidateForms(t.word).forEach(f => { map[f] = map[f] || t; });
+    const isPhrase = /\s/.test(t.word.trim());
+    if (isPhrase) {
+      const forms = (t.matchedForms && t.matchedForms.length ? t.matchedForms : [t.word]);
+      phrases.push({ target: t, forms });
+    } else {
+      (t.matchedForms && t.matchedForms.length ? t.matchedForms : [t.word]).forEach(f => { wordMap[String(f).toLowerCase()] = t; });
+      candidateForms(t.word).forEach(f => { wordMap[f] = wordMap[f] || t; });
+    }
   });
+  // 先匹配短语（按长度降序，先匹配长的避免重叠），记录占位区间
+  const hits = []; // { start, end, text, target }
+  phrases.forEach(p => {
+    p.forms.forEach(f => {
+      const norm = s => s.toLowerCase().replace(/[\s\-]+/g, " ").trim();
+      const hay = norm(text), needle = norm(f);
+      let i = 0;
+      while ((i = hay.indexOf(needle, i)) !== -1) {
+        hits.push({ start: i, end: i + needle.length, text: text.slice(i, i + needle.length), target: p.target });
+        i += needle.length;
+      }
+    });
+  });
+  hits.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+  // 去掉重叠（保留先匹配/较长的）
+  const occupied = [];
+  const cleanHits = hits.filter(h => {
+    if (occupied.some(o => h.start < o.end && h.end > o.start)) return false;
+    occupied.push(h); return true;
+  });
+  // 再匹配单词 token
   const re = /([A-Za-z]+(?:['’\-][A-Za-z]+)?)/g;
-  let html = "", last = 0, m;
+  let m;
   while ((m = re.exec(text))) {
-    html += esc(text.slice(last, m.index));
-    const t = map[m[0].toLowerCase()];
-    if (t) html += `<span class="ctx-w ${ctxWordClass(t)}" data-cw="${t.wordId}">${esc(m[0])}</span>`;
-    else html += esc(m[0]);
-    last = re.lastIndex;
+    const start = m.index, end = re.lastIndex;
+    if (occupied.some(o => start < o.end && end > o.start)) continue; // 已在短语区间内
+    const t = wordMap[m[0].toLowerCase()];
+    if (t) cleanHits.push({ start, end, text: m[0], target: t });
   }
+  cleanHits.sort((a, b) => a.start - b.start);
+  // 组装 HTML
+  let html = "", last = 0;
+  cleanHits.forEach(h => {
+    html += esc(text.slice(last, h.start));
+    html += `<span class="ctx-w ${ctxWordClass(h.target)}" data-cw="${h.target.wordId}">${esc(h.text)}</span>`;
+    last = h.end;
+  });
   html += esc(text.slice(last));
   return html;
 }
