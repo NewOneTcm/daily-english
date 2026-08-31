@@ -317,8 +317,8 @@ function renderVocab(main) {
       ${od ? `<p class="hint" style="color:var(--amber)">⚠️ ${od} 个词卡在某一步超过 14 天，点下方筛选「待解释 / 待造句 / 未入库」清理。</p>` : ""}
       ${queue.map(v => {
         const dm = DISPOSITION_META[v.disposition];
-        return `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)">
-          <span><span class="tag-fb" style="background:${dm.color}22;color:${dm.color}">${dm.label}</span> <b>${esc(v.display)}</b></span>
+        return `<div class="row" style="justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line);cursor:pointer" data-vq="${v.id}" title="点击定位到这个生词">
+          <span><span class="tag-fb" style="background:${dm.color}22;color:${dm.color}">${dm.label}</span> <b style="color:var(--accent)">${esc(v.display)}</b></span>
           <span class="hint" style="margin:0">${vocabStepLabel(v)}</span>
         </div>`;
       }).join("")}
@@ -328,6 +328,23 @@ function renderVocab(main) {
   list.forEach(v => bindVocabEntry(main, v));
   main.querySelectorAll("[data-vf]").forEach(b =>
     b.addEventListener("click", () => { vocabFilter = b.dataset.vf; render(); }));
+  // 今日任务点击 → 跳到对应生词条目（若被筛选隐藏，先切回「全部」）
+  main.querySelectorAll("[data-vq]").forEach(el =>
+    el.addEventListener("click", () => {
+      const id = Number(el.dataset.vq);
+      const target = document.getElementById("vocab-" + id);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "center" });
+        target.style.outline = "2px solid var(--accent)";
+        setTimeout(() => { target.style.outline = ""; }, 1600);
+      } else {
+        vocabFilter = "all"; render();
+        setTimeout(() => {
+          const t2 = document.getElementById("vocab-" + id);
+          if (t2) { t2.scrollIntoView({ behavior: "smooth", block: "center" }); t2.style.outline = "2px solid var(--accent)"; setTimeout(() => { t2.style.outline = ""; }, 1600); }
+        }, 60);
+      }
+    }));
 }
 function vocabEntryHTML(v) {
   vocabEnsureNewFields(v);
@@ -337,7 +354,7 @@ function vocabEntryHTML(v) {
   const fb = v.fb || [];
   const lastFb = fb[fb.length - 1];
   return `
-    <div class="card vocab-entry">
+    <div class="card vocab-entry" id="vocab-${v.id}">
       <div class="row" style="justify-content:space-between">
         <div class="vocab-head">
           <b class="vocab-word">${esc(v.display)}</b>
