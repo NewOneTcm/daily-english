@@ -454,9 +454,9 @@ function nextLevelOf(level) {
 const SKILL_BADGE = { "听": "🎧 听力", "说": "🎙 开口说", "读": "📖 阅读", "写": "✍️ 动笔写" };
 const SPEECH_RATE = { A1: 0.7, A2: 0.8, B1: 0.9, B2: 1, C1: 1, C2: 1.05 };
 
-/* ---- 模块时长追踪：精读(eread)/场景阅读(ctx) 停留时长计入统计 ----
+/* ---- 模块时长追踪：精读(eread)/场景阅读(ctx)/生词库(vocab) 停留时长计入统计 ----
    进入对应 tab 开始计时，切走或页面隐藏时结算落库到 state.activities。 */
-const TRACKED_TABS = { eread: "精读", ctx: "场景阅读" };
+const TRACKED_TABS = { eread: "精读", ctx: "场景阅读", vocab: "生词库" };
 let modTimer = null; // { tab, startedAt }
 function trackModuleTime(currentTab) {
   const now = Date.now();

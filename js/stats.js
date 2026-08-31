@@ -86,7 +86,7 @@ function renderStats(main) {
     <div class="card">
       <div class="section-title">近 14 天学习时长（分钟 / 天）</div>
       ${svgBarChart(durRows, [{ key: "m", color: "#17795b" }], { min: 5 })}
-      <p class="hint">打卡 + 加练 + 精读 + 场景阅读 都算。每天几分钟，柱子连成一片就是你的坚持。</p>
+      <p class="hint">打卡 + 加练 + 精读 + 场景阅读 + 生词库 都算。每天几分钟，柱子连成一片就是你的坚持。</p>
     </div>
     <div class="card">
       <div class="section-title">近 14 天新学内容（条 / 天）</div>
@@ -103,7 +103,7 @@ function renderStats(main) {
     </div>
     <div class="card">
       <div class="section-title">今天</div>
-      <p style="font-size:14px">学习 ${fmtMins(today.secs)} · 打卡${dayToday && dayToday.done ? " ✓" : " ✗"} · 加练 ${today.sessions} 次${today.readSecs ? " · 精读/场景阅读 " + fmtMins(today.readSecs) : ""} · 新学 ${today.nw + today.np + today.ns} 条${(today.autoW || today.autoP) ? `（含生词库新收 ${today.autoW} 词 ${today.autoP} 短语）` : ""}</p>
+      <p style="font-size:14px">学习 ${fmtMins(today.secs)} · 打卡${dayToday && dayToday.done ? " ✓" : " ✗"} · 加练 ${today.sessions} 次${today.readSecs ? " · 精读/场景阅读/生词库 " + fmtMins(today.readSecs) : ""} · 新学 ${today.nw + today.np + today.ns} 条${(today.autoW || today.autoP) ? `（含生词库新收 ${today.autoW} 词 ${today.autoP} 短语）` : ""}</p>
       ${items ? `<p class="hint" style="margin-top:6px">开工至今攒下 <b style="color:var(--accent)">${items}</b> 个新表达（${tot.nw} 词 · ${tot.np} 短语 · ${tot.ns} 句），总时长 ${fmtMins(tot.secs)}。慢慢来，比较快。</p>` : `<p class="hint" style="margin-top:6px">学完在「今天」或「加练」页记一笔新学内容，这里就会长出你的成就曲线。</p>`}
     </div>`;
 }
