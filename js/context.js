@@ -1,5 +1,5 @@
 /* ============ 场景阅读（Context Practice）模块 ============
-   取生词库里不熟次数最高的词 → 归到同一场景 → LLM 生成 500 字短文 →
+   取生词库里不熟次数最高的词 → 归到同一场景 → LLM 生成 400 字短文 →
    文中高亮 → 标记「还不熟 / 认识了」→ 回写计数 → 越不熟的词出现频率越高。
    参考：场景阅读模块_完整逻辑文档.md（V1 闭环）。本文件独立，可单独维护。
 */
@@ -129,10 +129,10 @@ async function ctxStage2(words, scene) {
   const text = await aiChat([
     { role: "system", content: `你是英语教学助手，请为英语学习者写一篇用于"在语境中巩固生词"的英文短文。
 【目标词】以下词必须全部出现在文章中（允许使用常见变形：复数、时态、分词、派生词）。
-【文章要求】1. 字数约 500 个英文单词（±10%）；2. 体裁 story；场景：${scene}；难度 CEFR ${level}；3. 除目标词外其余用词明显低于目标词难度，上下文易懂；4. 每个目标词出现 1–3 次，首次出现必须自带语境线索（同义复现/反义对比/举例/定义解释/因果情境）；5. 目标词必须出现在有信息量的句子里；6. 有完整情节或清晰论点，不要写成单词例句拼盘；7. 用常见英文名。
+【文章要求】1. 字数约 400 个英文单词（±10%）；2. 体裁 story；场景：${scene}；难度 CEFR ${level}；3. 除目标词外其余用词明显低于目标词难度，上下文易懂；4. 每个目标词出现 1–3 次，首次出现必须自带语境线索（同义复现/反义对比/举例/定义解释/因果情境）；5. 目标词必须出现在有信息量的句子里；6. 有完整情节或清晰论点，不要写成单词例句拼盘；7. 用常见英文名。
 【输出格式】严格输出 JSON，不要输出多余文字：{"title":"","title_zh":"","content_en":"英文正文，段落间用 \\n\\n 分隔","content_zh":"中文全文翻译","target_words":[{"word":"原形","matched_forms":["文中实际形式"],"first_sentence":"首次出现的完整英文句子","clue_type":"同义复现/反义对比/举例/定义解释/因果情境","sense_zh":"文中义","explanation_zh":"线索说明（30字内）"}]}` },
     { role: "user", content: JSON.stringify(targets) },
-  ], { timeoutMs: 240000, retries: 3, retryDelayMs: 2500 }); // 写 500 字短文最耗时，放宽到 4 分钟、多重试几次
+  ], { timeoutMs: 240000, retries: 3, retryDelayMs: 2500 }); // 写 400 字短文最耗时，放宽到 4 分钟、多重试几次
   const r = parseJsonFromAI(text);
   if (!r.content_en || !Array.isArray(r.target_words)) throw new Error("文章返回格式不对");
   return r;
@@ -188,7 +188,7 @@ async function ctxStage2Retry(words, scene, missing) {
   const level = state.level || "B1";
   const targets = words.map(v => ({ word: v.display, user_gloss: (v.explain || "").split("\n")[0].slice(0, 60), is_phrase: /\s/.test(v.display.trim()) }));
   const text = await aiChat([
-    { role: "system", content: `你是英语教学助手。为"在语境中巩固生词"写一篇英文短文。场景：${scene}；难度 CEFR ${level}；约 500 词；目标词必须全部出现，每个 1–3 次，首次出现自带语境线索。【特别注意】下面这些词上一版漏了，这次必须出现：${missing.join("、")}。严格输出 JSON：{"title":"","title_zh":"","content_en":"","content_zh":"","target_words":[{"word":"","matched_forms":[],"first_sentence":"","clue_type":"","sense_zh":"","explanation_zh":""}]}` },
+    { role: "system", content: `你是英语教学助手。为"在语境中巩固生词"写一篇英文短文。场景：${scene}；难度 CEFR ${level}；约 400 词；目标词必须全部出现，每个 1–3 次，首次出现自带语境线索。【特别注意】下面这些词上一版漏了，这次必须出现：${missing.join("、")}。严格输出 JSON：{"title":"","title_zh":"","content_en":"","content_zh":"","target_words":[{"word":"","matched_forms":[],"first_sentence":"","clue_type":"","sense_zh":"","explanation_zh":""}]}` },
     { role: "user", content: JSON.stringify(targets) },
   ], { timeoutMs: 240000, retries: 3, retryDelayMs: 2500 });
   const r = parseJsonFromAI(text);
@@ -298,7 +298,7 @@ function renderCtxArticle(main, art) {
         <button class="btn ghost" id="ctxBack">← 返回</button>
       </div>
       <div class="task-meta">${esc(art.genre)} · ${esc(art.level)} · ${art.wordCount} 词 · ${art.targets.length} 个目标词${art.missingNote ? ` · <span style="color:var(--amber)">${esc(art.missingNote)}</span>` : ""}</div>
-      <p class="hint" style="margin-top:6px">橙色下划线 = 一般难词，红色底 = 顽固难词。点词看详情并标记。</p>
+      <p class="hint" style="margin-top:6px">橙色下划线 = 一般难词，红色底 = 顽固难词。<b>不认识的词点开看解释并标记；没点开的词，点「完成」时会自动算你熟悉了。</b></p>
     </div>
     <div class="card">
       <div class="read-text" id="ctxBody">${ctxTokenizeHTML(art.contentEn, art.targets)}</div>
@@ -324,10 +324,13 @@ function renderCtxArticle(main, art) {
     render();
   });
   $("#ctxFinish").addEventListener("click", () => {
+    // 逻辑：只有不认识的词你才会点开看解释；没点开、也没标记的词，视为你已经熟悉了
+    // 完成时把未标记的词自动按「认识了」回写（known+1，满阈值毕业）
+    art.targets.forEach(t => { if (!t.marked && t.wordId) ctxMarkWord(art.id, t.wordId, "known"); });
     art.status = "finished"; art.finishedAt = new Date().toISOString(); save();
     const unk = art.targets.filter(t => t.marked === "unknown").length;
     const kn = art.targets.filter(t => t.marked === "known").length;
-    alert(`本篇小结：${art.targets.length} 个目标词 · 认识 ${kn} · 还不熟 ${unk}`);
+    alert(`本篇小结：${art.targets.length} 个目标词 · 认识 ${kn}（含未点开自动算熟悉）· 还不熟 ${unk}`);
     ctxView.articleId = null; render();
   });
 }
