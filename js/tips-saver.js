@@ -74,6 +74,10 @@ function renderTipsSaver(container, tips, opts) {
     m.className = "saved-mark";
     m.textContent = text;
     slot.appendChild(m);
+    // 存完后移除该条的删除按钮（不用刷新页面）
+    const li = slot.closest("li");
+    const delBtn = li && li.querySelector("[data-del]");
+    if (delBtn) delBtn.remove();
   };
   const updateSaveAll = () => {
     const left = list.filter(t => t.en && !isSaved(t)).length;
