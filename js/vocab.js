@@ -13,7 +13,9 @@ function addVocab(word, sentence) {
       // 升级版新增字段
       isPhrase: /\s/.test(word.trim()), pos: "", glossZh: "", aiExample: "", aiExampleZh: "",
       collocations: [], family: [], memoryTip: "", senses: [],
-      disposition: "recognition", dispositionLocked: false, workshopStep: 0, priorityScore: 0,
+      // 默认产出词（短语必产出；单词先按产出走，AI 解释后按 freqHint 精修：低频专名才会降为掠过）
+      // 若默认 recognition，所有新词都会被「待造句」筛选排除、也没有造句框
+      disposition: "production", dispositionLocked: false, workshopStep: 0, priorityScore: 0,
       sentenceVerdict: "none", errorTags: [], cardId: null, freqHint: "low", familyKey: "", processedAt: null,
     };
     state.vocab.push(entry);
@@ -289,12 +291,13 @@ function vocabStatus(v) {
 }
 function renderVocab(main) {
   const all = [...(state.vocab || [])].map(vocabEnsureNewFields).reverse();
+  // 待造句只统计"该造句的产出词"——认知词/掠过词本来就不造句，不该出现在这个筛选里
   const todoExplain = all.filter(v => !(v.explain || "").trim()).length;
-  const todoExample = all.filter(v => !(v.example || "").trim()).length;
+  const todoExample = all.filter(v => v.disposition === "production" && !(v.example || "").trim()).length;
   const todoSave = all.filter(v => !v.saved).length;
   const FILTERS = [["all", "全部", all.length], ["explain", "待解释", todoExplain], ["example", "待造句", todoExample], ["unsaved", "未入库", todoSave]];
   const vfMatch = v => vocabFilter === "explain" ? !(v.explain || "").trim()
-    : vocabFilter === "example" ? !(v.example || "").trim()
+    : vocabFilter === "example" ? (v.disposition === "production" && !(v.example || "").trim())
     : vocabFilter === "unsaved" ? !v.saved : true;
   const list = all.filter(vfMatch);
   // 今日任务队列（优先级最高的 6 个待加工词）
