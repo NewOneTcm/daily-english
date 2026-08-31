@@ -6,12 +6,21 @@ function addVocab(word, sentence) {
   let entry = (state.vocab || []).find(v => v.word === w);
   if (!entry) {
     state.nextVocabId = state.nextVocabId || (state.vocab.length + 1);
-    entry = { id: state.nextVocabId++, word: w, display: word, sentence, explain: "", example: "", fb: [], saved: false, added: todayKey() };
+    // 场景阅读计数：加入生词本即"我不认识"，unknownCount 初始为 1
+    entry = { id: state.nextVocabId++, word: w, display: word, sentence, explain: "", example: "", fb: [], saved: false, added: todayKey(), unknownCount: 1, exposureCount: 0, knownStreak: 0, status: "learning" };
     state.vocab.push(entry);
   } else {
     entry.sentence = sentence; // 用最新的出处句子
   }
   return entry;
+}
+// 场景阅读：生词状态计数兜底（旧数据可能没有这几个字段）
+function ensureCtxCounts(v) {
+  if (typeof v.unknownCount !== "number") v.unknownCount = 1;
+  if (typeof v.exposureCount !== "number") v.exposureCount = 0;
+  if (typeof v.knownStreak !== "number") v.knownStreak = 0;
+  if (!v.status) v.status = "learning";
+  return v;
 }
 // 精读 AI 提取批量入库：把释义直接写入 explain（跳过“待解释”一步，进入造句/入库精加工）
 function addVocabExtracted(word, explain, sentence) {
