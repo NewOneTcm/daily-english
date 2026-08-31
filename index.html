@@ -335,6 +335,7 @@
 <script src="js/eread.js"></script>
 <script src="js/vocab.js"></script>
 <script src="js/context.js"></script>
+<script src="js/dictation.js"></script>
 <script>
 "use strict";
 
@@ -350,7 +351,7 @@ function todayKey(offset = 0) {
 function dayNum(key) { return Math.floor(new Date(key + "T00:00:00").getTime() / 86400000); }
 
 function blankState() {
-  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, journal: {}, readText: "", readTexts: [], nextReadId: 1, listenReview: [], nextLrId: 1, ctxArticles: [], nextCtxId: 1, activities: [], ai: { base: "", key: "", model: "" }, updatedAt: 0 };
+  return { level: null, createdAt: todayKey(), days: {}, cards: [], nextCardId: 1, sessions: [], nextSessionId: 1, vocab: [], nextVocabId: 1, extraSeen: {}, journal: {}, readText: "", readTexts: [], nextReadId: 1, listenReview: [], nextLrId: 1, ctxArticles: [], nextCtxId: 1, activities: [], exportBatches: [], ai: { base: "", key: "", model: "" }, updatedAt: 0 };
 }
 function load() {
   try {
@@ -486,6 +487,7 @@ function render() {
       <button data-tab="journal" class="${tab === "journal" ? "active" : ""}">日记</button>
       <button data-tab="eread" class="${tab === "eread" ? "active" : ""}">精读</button>
       <button data-tab="ctx" class="${tab === "ctx" ? "active" : ""}">场景阅读</button>
+      <button data-tab="dict" class="${tab === "dict" ? "active" : ""}">听写</button>
       <button data-tab="extra" class="${tab === "extra" ? "active" : ""}">加练</button>
       <button data-tab="review" class="${tab === "review" ? "active" : ""}">复习${due ? `<span class="badge">${due}</span>` : ""}</button>
       <button data-tab="cards" class="${tab === "cards" ? "active" : ""}">表达库</button>
@@ -505,6 +507,7 @@ function render() {
   else if (tab === "journal") renderJournal(main);
   else if (tab === "eread") renderERead(main);
   else if (tab === "ctx") renderContext(main);
+  else if (tab === "dict") renderDictation(main);
   else if (tab === "extra") renderExtra(main);
   else if (tab === "review") renderReview(main);
   else if (tab === "cards") renderCards(main);
