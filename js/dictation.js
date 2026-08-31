@@ -150,10 +150,12 @@ function dictEnsureState(v) {
   return v;
 }
 function dictDaysSince(iso) { return iso ? (Date.now() - new Date(iso).getTime()) / 86400000 : 999; }
-// 可导出的生词：开启拼写、有内容、长度足够（≤2 字母跳过）
+// 可导出的生词：开启拼写、有内容、长度足够（≤2 字母跳过）；掠过词不导（分诊）
 function dictExportable() {
   return (state.vocab || []).filter(v => {
     dictEnsureState(v);
+    if (typeof vocabEnsureNewFields === "function") vocabEnsureNewFields(v);
+    if (v.disposition === "skim") return false;
     const w = v.display.trim();
     return v.dictationEnabled === 1 && w.replace(/[^a-zA-Z]/g, "").length > 2;
   });

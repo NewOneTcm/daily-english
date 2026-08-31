@@ -75,7 +75,7 @@ function validateArticle(contentEn, targets) {
 /* ---- 选词（文档 §3） ---- */
 function ctxPracticePool() {
   return (state.vocab || []).map(ensureCtxCounts)
-    .filter(v => v.status === "learning" && v.unknownCount >= 1);
+    .filter(v => contextPracticeFilter(v)); // 排除掠过词（生词库分诊）
 }
 function priorityScore(v, now) {
   const daysSince = v.lastExposedAt ? (now - new Date(v.lastExposedAt).getTime()) / 86400000 : 999;
