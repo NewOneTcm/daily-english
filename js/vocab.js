@@ -11,6 +11,14 @@ function addVocab(word, sentence) {
     state.vocab.push(entry);
   } else {
     entry.sentence = sentence; // 用最新的出处句子
+    ensureCtxCounts(entry);
+    // 回炉：已掌握（mastered）的词被重新加入，说明又忘了 → 重新进待练池
+    if (entry.status === "mastered") {
+      entry.status = "learning";
+      entry.unknownCount += 1;
+      entry.knownStreak = 0;
+      entry.masteredAt = undefined;
+    }
   }
   return entry;
 }
