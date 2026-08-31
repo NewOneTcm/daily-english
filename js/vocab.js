@@ -13,6 +13,16 @@ function addVocab(word, sentence) {
   }
   return entry;
 }
+// 精读 AI 提取批量入库：把释义直接写入 explain（跳过“待解释”一步，进入造句/入库精加工）
+function addVocabExtracted(word, explain, sentence) {
+  const entry = addVocab(word, sentence);
+  if (!(entry.explain || "").trim() && explain) entry.explain = explain;
+  return entry;
+}
+function vocabExists(word) {
+  const k = String(word || "").trim().toLowerCase();
+  return (state.vocab || []).some(v => String(v.word || v.display || "").trim().toLowerCase() === k);
+}
 async function aiReviewVocab(entry, btn) {
   // runAiReview 内部对 day.feedback 重新赋值，用代理对象接住再回写
   const proxy = { draft: entry.example, feedback: entry.fb || [] };

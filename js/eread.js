@@ -16,7 +16,7 @@ function renderERead(main) {
       <div class="btn-row">
         <button class="btn primary" id="rtAdd">保存并开始读</button>
       </div>
-      <p class="hint">读过的文本都保留在下面，随时回来重读。读的时候：<b>划选单词或句子</b>弹出 AI 解释，可存生词库；或点「AI 提取生词词组」批量提取，存表达库。</p>
+      <p class="hint">读过的文本都保留在下面，随时回来重读。读的时候：<b>划选单词或句子</b>弹出 AI 解释，可存生词库；或点「AI 提取生词词组」批量提取，存入生词库。</p>
     </div>
     <div id="rtList"></div>`;
   $("#rtAdd").addEventListener("click", () => {
@@ -70,11 +70,99 @@ function paintEreadTips(box, item) {
   const tips = item.tips; // 存在文本上，切走再回来不丢
   if (!tips || !tips.length) return;
   const head = document.createElement("div");
-  head.innerHTML = '<div class="section-title" style="margin-top:14px">AI 提取的学习点</div>';
+  head.innerHTML = `
+    <div class="section-title" style="margin-top:14px">AI 提取的学习点</div>
+    <p class="hint" style="margin-top:2px">下面的生词/词组存入<b>生词库</b>（带释义和出处原句），进生词库做 AI 解释、造句、AI 点评、存学习库。</p>`;
   box.appendChild(head);
   const holder = document.createElement("div");
   box.appendChild(holder);
-  renderTipsSaver(holder, tips, { type: "expr", itemLabel: "存入表达库", wordFirst: true });
+  renderEreadVocabSaver(holder, tips);
+}
+
+/* 精读提取结果 → 存生词库（而不是表达库）。
+   语义与划词入库一致：词/词组进生词库，带释义和出处原句，等造句/入库精加工。
+   tips: [{ en, zh, ctx, saved? }]；saved 表示已入生词库。 */
+function renderEreadVocabSaver(container, tips) {
+  if (!container) return;
+  container.innerHTML = "";
+  const list = (tips || []).filter(t => t && (t.en || t.zh));
+  if (!list.length) return;
+  const isSaved = t => t.saved || vocabExists(t.en);
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="btn-row" style="margin-top:10px">
+      <button class="btn primary" data-saveall>一键全部存入生词库</button>
+    </div>
+    <ul class="tips">
+      ${list.map((t, i) => `
+        <li>
+          <div class="tip-zh">${t.praise ? "🌟 " : ""}${esc(t.en)} <span style="color:var(--ink-2);font-weight:400">— ${esc(t.zh)}</span></div>
+          ${t.ctx ? `<div class="tip-en">${esc(t.ctx)}</div>` : ""}
+          ${isSaved(t) ? "" : `<button class="btn ghost danger" data-del="${i}" title="不要这条，删掉" style="padding:4px 10px;font-size:12px">×</button>`}
+          <span data-slot="${i}"></span>
+        </li>`).join("")}
+    </ul>`;
+  container.appendChild(wrap);
+
+  wrap.querySelectorAll("[data-del]").forEach(b =>
+    b.addEventListener("click", () => {
+      const t = list[Number(b.dataset.del)];
+      const oi = tips.indexOf(t);
+      if (oi >= 0) tips.splice(oi, 1);
+      save();
+      renderEreadVocabSaver(container, tips);
+    }));
+
+  const saveAllBtn = wrap.querySelector("[data-saveall]");
+  const markSaved = (slot, text) => {
+    slot.innerHTML = "";
+    const m = document.createElement("span");
+    m.className = "saved-mark";
+    m.textContent = text;
+    slot.appendChild(m);
+  };
+  const updateSaveAll = () => {
+    const left = list.filter(t => t.en && !isSaved(t)).length;
+    if (left === 0) {
+      const d = document.createElement("span");
+      d.className = "saved-mark";
+      d.textContent = "已全部存入 ✓";
+      saveAllBtn.replaceWith(d);
+    } else {
+      saveAllBtn.textContent = "一键全部存入生词库（" + left + "）";
+    }
+  };
+  const saveOne = (t, slot) => {
+    if (isSaved(t)) { markSaved(slot, "已在生词库"); updateSaveAll(); return; }
+    addVocabExtracted(t.en, t.zh, t.ctx || "");
+    t.saved = true;
+    save();
+    markSaved(slot, "已入生词库 ✓");
+    updateSaveAll();
+  };
+  list.forEach((t, i) => {
+    const slot = wrap.querySelector('[data-slot="' + i + '"]');
+    if (!t.en) return;
+    if (isSaved(t)) { markSaved(slot, t.saved ? "已入生词库 ✓" : "已在生词库"); return; }
+    const b = document.createElement("button");
+    b.className = "btn primary";
+    b.textContent = "存入生词库";
+    b.addEventListener("click", () => saveOne(t, slot));
+    slot.appendChild(b);
+  });
+  saveAllBtn.addEventListener("click", () => {
+    let added = 0, dup = 0;
+    list.forEach((t, i) => {
+      if (!t.en) return;
+      const slot = wrap.querySelector('[data-slot="' + i + '"]');
+      if (isSaved(t)) { dup++; markSaved(slot, "已在生词库"); }
+      else { addVocabExtracted(t.en, t.zh, t.ctx || ""); t.saved = true; added++; markSaved(slot, "已入生词库 ✓"); }
+    });
+    save();
+    updateSaveAll();
+    toast("存入生词库 " + added + " 条" + (dup ? "，" + dup + " 条已存在跳过" : ""));
+  });
+  updateSaveAll();
 }
 
 async function runAiExtract(textId, btn) {
