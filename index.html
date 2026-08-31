@@ -315,10 +315,33 @@
     border: 1px solid var(--accent); box-shadow: 0 8px 28px rgba(20,40,30,.16); z-index: 60;
   }
   @media (max-width: 760px) { .ctx-detail { position: static; width: auto; max-height: none; margin-top: 14px; box-shadow: none; } }
+
+  /* 回到顶部 */
+  #toTop {
+    position: fixed; right: 18px; bottom: 24px; z-index: 70;
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--card, #fff); color: var(--ink-2); font-size: 20px; line-height: 1;
+    cursor: pointer; box-shadow: 0 4px 14px rgba(20,40,30,.12);
+    opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
+    transform: translateY(8px);
+  }
+  #toTop.show { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  #toTop:hover { color: var(--accent); border-color: var(--accent); }
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
+<button id="toTop" title="回到顶部" aria-label="回到顶部">↑</button>
+<script>
+// 回到顶部：滚动超过一屏才出现，点击平滑回顶
+(function () {
+  const b = document.getElementById("toTop");
+  const onScroll = () => b.classList.toggle("show", window.scrollY > window.innerHeight * 0.8);
+  window.addEventListener("scroll", onScroll, { passive: true });
+  b.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  onScroll();
+})();
+</script>
 
 <script src="b2-reading.js"></script>
 <script src="js/tasks-data.js"></script>
