@@ -375,7 +375,7 @@ function vocabEntryHTML(v) {
         <button class="btn" data-aiexp="${v.id}">AI 解释（结合原句）</button>
       </div>
       ${v.glossZh ? `<div class="vocab-sent" style="margin-top:8px">${esc(v.pos)} ${esc(v.glossZh)}${v.aiExample ? `<br>例：${esc(v.aiExample)}${v.aiExampleZh ? "（" + esc(v.aiExampleZh) + "）" : ""}` : ""}${v.memoryTip ? `<br>助记：${esc(v.memoryTip)}` : ""}</div>` : ""}
-      <textarea data-vzh="${v.id}" style="margin-top:10px;min-height:112px" placeholder="释义：点「AI 解释」自动填，也可以自己写一条">${esc(v.explain)}</textarea>
+      <textarea data-vzh="${v.id}" style="margin-top:10px;min-height:112px" placeholder="释义：点「AI 解释」自动填，也可以自己写一条">${esc(v.glossZh ? (v.pos + " " + v.glossZh).trim() : (v.explain || ""))}</textarea>
       ${canSentence ? `
       <div class="mini-label">请造句：</div>
       <textarea data-vex="${v.id}" style="min-height:70px" placeholder="用「${esc(v.display)}」造一句你自己的话，别抄原句…">${esc(v.example)}</textarea>
