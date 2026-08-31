@@ -97,7 +97,8 @@ function renderJournal(main) {
   // 点评结果持久化：存到 state.journalTips[日期]，切走再回来不丢
   function paintJournalTips() {
     renderTipsSaver($("#jTips"), journalTips, {
-      type: "fb", ctxFallback: "日记 " + journalSel, itemLabel: "存入表达库",
+      kind: "correction", source: "diary", draft: (state.journal || {})[journalSel] || "",
+      ctxFallback: "日记 " + journalSel, itemLabel: "存入表达库",
     });
   }
   $("#jCheck").addEventListener("click", async () => {

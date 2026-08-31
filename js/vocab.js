@@ -76,9 +76,12 @@ async function runAiVocabExplain(entry, btn) {
 }
 function vocabToCard(entry) {
   const firstLine = (entry.explain || "").split("\n")[0].slice(0, 60);
-  const en = entry.example ? `${entry.display}: ${entry.example}` : entry.display;
-  const zh = `「${entry.display}」${firstLine ? "：" + firstLine : ""}，看释义回忆你的造句`;
-  addCard(en, zh, `原句：${entry.sentence}`, "vocab");
+  // 生词卡：只存 wordId 引用 + 释义，不拷贝英文内容（导出时实时取 words 表与拼写挖空算法）
+  addCard({
+    en: entry.display, zh: firstLine || entry.display,
+    ctx: entry.sentence ? `原句：${entry.sentence}` : "",
+    kind: "word", source: "vocab", wordId: entry.id,
+  });
   entry.saved = true;
 }
 /* ---- 生词库（独立页）：AI 解释 → 造句 → AI 点评 → 点评逐条存学习库 ---- */
@@ -172,7 +175,7 @@ function bindVocabEntry(main, v) {
   const vt = q(`[data-vtips="${v.id}"]`);
   if (vt && v.fb && v.fb.length) {
     renderTipsSaver(vt, v.fb, {
-      type: "vtip", ctxFallback: "生词「" + v.display + "」的造句点评",
+      kind: "collocation", source: "vocab", ctxFallback: "生词「" + v.display + "」的造句点评",
       itemLabel: "存到学习库", saveAllLabel: "一键全部存到学习库",
     });
   }

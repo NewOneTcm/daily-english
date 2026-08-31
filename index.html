@@ -643,8 +643,9 @@ function bindQuickAdd(root) {
     const zh = $("#qaZh", root).value.trim();
     const ctx = $("#qaCtx", root).value.trim();
     if (!en || !zh) { alert("英文和意思都要填"); return; }
-    addCard(en, zh, ctx, "expr");
+    const r = addCard({ en, zh, ctx, kind: "phrase", source: "manual" });
     save(); render();
+    if (!r.ok && r.reason) toast(r.reason);
   });
 }
 

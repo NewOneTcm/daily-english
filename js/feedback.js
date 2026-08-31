@@ -25,6 +25,20 @@ const FEEDBACK_RULES = [
 
 const LINK_WORDS = /\b(however|because|although|though|but|so|then|also|for example|for instance|in addition|first|second|finally|instead|therefore|besides|actually)\b/i;
 
+// 从原文中提取与某条反馈相关的原句，作为纠错卡的 original（我原来怎么写的）
+function extractOriginalSentence(draft, tip) {
+  const ctx = (tip && tip.ctx || "").replace(/[「」]/g, "").replace(/…/g, "").trim();
+  if (ctx) return ctx;
+  const norm = s => String(s || "").toLowerCase().replace(/[^a-z]/g, "");
+  const probe = norm(tip && tip.en || "");
+  const sents = String(draft || "").split(/[.!?…\n]+/).map(s => s.trim()).filter(Boolean);
+  if (probe) {
+    const hit = sents.find(s => norm(s) && (probe.includes(norm(s)) || norm(s).includes(probe)));
+    if (hit) return hit;
+  }
+  return sents[0] || String(draft || "").slice(0, 140);
+}
+
 function analyzeWriting(text, level) {
   const tips = [];
   const lv = LEVELS[level] || LEVELS.B1;
@@ -58,12 +72,102 @@ function analyzeWriting(text, level) {
   return tips;
 }
 
-function addCard(en, zh, ctx, type = "expr") {
-  state.cards.push({ id: state.nextCardId++, en, zh, ctx, type, step: 0, due: todayKey(), added: todayKey() });
+/* ============ 表达库入库（kind × source 双维度 + 去重 + 信息补全） ============
+   新签名：addCard({ en, zh, ctx, original, reason, errorTag, kind, source, wordId, scene, register })
+   兼容旧签名：addCard(en, zh, ctx, type) —— 旧 type 会按 CARD_MIGRATE 映射到 kind/source。
+   返回：{ ok, card?, reason? } —— ok=false 表示已存在（可能已补全信息），不是失败。 */
+const CARD_KINDS = {
+  phrase: { label: "地道表达", color: "#10b981", desc: "值得记住的说法" },
+  correction: { label: "纠错", color: "#ef4444", desc: "我写/说错了的地方" },
+  word: { label: "生词", color: "#3b82f6", desc: "复用拼写挖空算法" },
+  collocation: { label: "搭配", color: "#8b5cf6", desc: "固定搭配与词组" },
+  sentence: { label: "整句", color: "#f59e0b", desc: "含目标表达的完整句" },
+};
+const CARD_SOURCES = {
+  diary: { label: "日记" }, writing: { label: "写作" }, reading: { label: "阅读" },
+  speaking: { label: "口语打卡" }, vocab: { label: "生词库" }, manual: { label: "手动" },
+};
+// 旧 type → 新 kind/source（数据迁移用）
+const CARD_MIGRATE = {
+  expr: { kind: "phrase", source: "manual" },
+  fb: { kind: "correction", source: "speaking" },
+  vocab: { kind: "word", source: "vocab" },
+  vtip: { kind: "collocation", source: "vocab" },
+};
+const REGISTER_LABEL = { formal: "正式场合", informal: "日常口语", academic: "学术写作", spoken: "口语", slang: "俚语" };
+
+// 去重组键：小写 + 撇号删除 + 其余标点转空格 + 压缩空格 + 去首冠词
+// 撇号删除（it's → its），其余标点转空格，保证 "It's a steal." / "its a steal" 同一条
+function makeDedupeKey(en, kind) {
+  const norm = String(en || "").toLowerCase()
+    .replace(/['’]/g, "")          // 撇号直接删掉（it's → its），不是转空格
+    .replace(/[^\w\s]/g, " ")       // 其余标点转空格
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^(a|an|the|to)\s+/, "");
+  return `${kind}:${norm}`;
+}
+function addCard(a, b, c, d) {
+  // 兼容旧签名 addCard(en, zh, ctx, type)
+  const input = (a && typeof a === "object")
+    ? Object.assign({}, a)
+    : { en: a, zh: b, ctx: c, type: d };
+
+  let kind = input.kind, source = input.source;
+  if (!kind && input.type) { // 旧 type 迁移
+    const map = CARD_MIGRATE[input.type];
+    if (map) { kind = map.kind; source = map.source; }
+  }
+  kind = CARD_KINDS[kind] ? kind : "phrase";
+  source = CARD_SOURCES[source] ? source : "manual";
+
+  const en = String(input.en || "").trim();
+  if (!en) return { ok: false, reason: "内容为空" };
+  const key = makeDedupeKey(en, kind);
+
+  const exist = (state.cards || []).find(c2 => c2.dedupeKey === key);
+  if (exist) {
+    // 已存在：做「信息补全」而非简单拒绝
+    let merged = false;
+    if (!exist.original && input.original) { exist.original = input.original; merged = true; }
+    if (!exist.reason && input.reason) { exist.reason = input.reason; merged = true; }
+    if (!exist.ctx && input.ctx) { exist.ctx = input.ctx; merged = true; }
+    if (!exist.wordId && input.wordId) { exist.wordId = input.wordId; merged = true; }
+    if (merged) save();
+    return { ok: false, card: exist, reason: merged ? "已存在，已补全信息" : "该表达已在库中" };
+  }
+
+  const card = {
+    id: state.nextCardId++,
+    en, zh: String(input.zh || "").trim(),
+    ctx: input.ctx || "", original: input.original || "", reason: input.reason || "",
+    errorTag: input.errorTag || "", kind, source,
+    wordId: input.wordId || null, scene: input.scene || "", register: input.register || "",
+    starred: false, mastered: false, exportCount: 0, exportedAt: null,
+    smLapses: 0, smReps: 0, smSyncedAt: null,
+    dedupeKey: key, added: todayKey(),
+  };
+  state.cards.push(card);
+  return { ok: true, card };
+}
+// 旧数据迁移：type → kind + source，补 dedupeKey
+function migrateCards() {
+  (state.cards || []).forEach(c => {
+    if (!c.kind || !c.source) {
+      const map = CARD_MIGRATE[c.type] || { kind: "phrase", source: "manual" };
+      c.kind = c.kind || map.kind;
+      c.source = c.source || map.source;
+    }
+    if (!c.dedupeKey) c.dedupeKey = makeDedupeKey(c.en, c.kind);
+    if (typeof c.exportCount !== "number") c.exportCount = 0;
+    if (typeof c.starred !== "boolean") c.starred = false;
+    if (typeof c.mastered !== "boolean") c.mastered = false;
+    if (typeof c.smLapses !== "number") c.smLapses = 0;
+  });
 }
 function cardExists(en) {
   const k = String(en || "").trim().toLowerCase();
-  return state.cards.some(c => String(c.en || "").trim().toLowerCase() === k);
+  return (state.cards || []).some(c => String(c.en || "").trim().toLowerCase() === k);
 }
 
 /* ============ AI 深度点评（可选，兼容 OpenAI 格式接口） ============ */
@@ -148,7 +252,9 @@ function feedbackSection(day) {
 }
 function bindFeedback(root, day) {
   renderTipsSaver($("#fbSaver", root), day.feedback || [], {
-    type: "fb", itemLabel: "存为复习点", saveAllLabel: "全部存到表达库",
+    // 打卡/加练的反馈是"我写错了的地方"→ 纠错卡，必须带 original 才有原文改造题
+    kind: "correction", source: "speaking", draft: day.draft,
+    itemLabel: "存为复习点", saveAllLabel: "全部存到表达库",
   });
   const aiBtn = $("#aiBtn", root);
   if (aiBtn) aiBtn.addEventListener("click", () => runAiReview(day, aiBtn));

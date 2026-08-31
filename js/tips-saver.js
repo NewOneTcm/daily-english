@@ -14,9 +14,25 @@
 function renderTipsSaver(container, tips, opts) {
   if (!container) return;
   const o = Object.assign({
-    type: "fb", ctxFallback: "", itemLabel: "存入表达库",
+    // 新：kind + source 双维度（推荐）；旧：type（自动迁移，兼容既有调用）
+    kind: null, source: "manual", type: null,
+    ctxFallback: "", itemLabel: "存入表达库",
     saveAllLabel: "一键全部存入表达库", wordFirst: false, onChange: null,
+    draft: null, // correction 类卡片：原文，用于自动回填 original（我原来怎么写的）
   }, opts || {});
+  // 统一成一次构造，供逐条与批量共用
+  const buildInput = t => {
+    const inp = {
+      en: t.en, zh: t.zh, ctx: t.ctx || o.ctxFallback,
+      original: t.original || "", reason: t.reason || "", errorTag: t.errorTag || "",
+      kind: o.kind, source: o.source, type: o.kind ? null : o.type,
+    };
+    // 纠错卡必须有 original，没有就从原文提取原句回填
+    if (inp.kind === "correction" && !inp.original && o.draft) {
+      inp.original = extractOriginalSentence(o.draft, t);
+    }
+    return inp;
+  };
   container.innerHTML = "";
   const list = (tips || []).filter(t => t && (t.en || t.zh));
   if (!list.length) return;
@@ -72,7 +88,7 @@ function renderTipsSaver(container, tips, opts) {
   };
   const saveOne = (t, slot) => {
     if (isSaved(t)) { markSaved(slot, "已存在"); updateSaveAll(); return; }
-    addCard(t.en, t.zh, t.ctx || o.ctxFallback, o.type);
+    addCard(buildInput(t));
     t.saved = true;
     save();
     markSaved(slot, "已存 ✓");
@@ -95,7 +111,7 @@ function renderTipsSaver(container, tips, opts) {
       if (!t.en) return;
       const slot = wrap.querySelector('[data-slot="' + i + '"]');
       if (isSaved(t)) { dup++; markSaved(slot, "已存在"); }
-      else { addCard(t.en, t.zh, t.ctx || o.ctxFallback, o.type); t.saved = true; added++; markSaved(slot, "已存 ✓"); }
+      else { addCard(buildInput(t)); t.saved = true; added++; markSaved(slot, "已存 ✓"); }
     });
     save();
     updateSaveAll();
